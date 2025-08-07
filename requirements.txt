@@ -1,4 +1,4 @@
-rdkit-pypi
+rdkit-pypi==2022.9.5
 pandas
 numpy
 scikit-learn
@@ -6,3 +6,4 @@ joblib
 matplotlib
 seaborn
 streamlit
+
