@@ -1,4 +1,4 @@
-rdkit-pypi==2022.9.5
+rdkit==2023.09.1
 pandas
 numpy
 scikit-learn
@@ -7,5 +7,6 @@ matplotlib
 seaborn
 streamlit
 python==3.10.13
+
 
 
