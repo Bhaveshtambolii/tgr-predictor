@@ -6,10 +6,10 @@ import numpy as np
 from rdkit import Chem
 from rdkit.Chem import AllChem
 
-# Load the model
+
 model = joblib.load("random_forest_tgr.pkl")
 
-# Convert SMILES to Morgan fingerprint
+
 def smiles_to_fp(smiles):
     mol = Chem.MolFromSmiles(smiles)
     if mol:
@@ -17,7 +17,7 @@ def smiles_to_fp(smiles):
     else:
         return None
 
-# Streamlit UI
+
 st.title("🧪 TGR Activity Predictor")
 st.markdown("Enter a compound SMILES to predict if it's **Active** or **Inactive** against TGR.")
 
