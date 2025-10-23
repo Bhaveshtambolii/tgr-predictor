@@ -16,20 +16,7 @@
 [![Streamlit](https://img.shields.io/badge/Deploy-Streamlit-orange.svg)](https://streamlit.io)
 
 ---
-
-### This project was developed as part of the:
-<div align="center">
-
-<h3>AI-DRIVEN DRUG DISCOVERY BOOT CAMP (AUGUST 4 – 8, 2025) </h3>  
-<h3>Organized by:Department of Biotechnology (Industry Institute Collaboration Cell)</h3> 
-<h3>National Institute of Technology – Raipur</h3>  
-
-</div>
-
-**Patron:** Prof. N.V. Ramana Rao, Director, NIT Raipur  
-**Chairperson:** Prof. S. Sanyal, Chairman, IICC, NIT Raipur  
-**Convenor:** Dr. Awanish Kumar, Associate Professor, Department of Biotechnology, NIT Raipur  
-**Coordinator:** Dr. Dijendra Nath Roy, Assistant Professor and IICC Coordinator, Department of Biotechnology, NIT Raipur  
+ 
 ## What is this?
 This repository contains a machine-learning pipeline and a Streamlit web app that predicts whether a chemical compound (given as a SMILES string) is **Active** or **Inactive** against the enzyme **TGR** (Thioredoxin Glutathione Reductase) — an antiparasitic drug target in *Schistosoma mansoni*.  
 The model is trained on qHTS assay data, SMILES are featurized using RDKit (Morgan fingerprints), and a Random Forest classifier is used for prediction.
