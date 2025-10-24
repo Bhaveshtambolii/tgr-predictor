@@ -28,7 +28,7 @@ The model is trained on qHTS assay data, SMILES are featurized using RDKit (Morg
 - Model: RandomForestClassifier (saved as `.pkl`)  
 - Web UI: Streamlit app for single-SMILES and batch CSV prediction  
 - Deployable: Instructions for Hugging Face Spaces, Streamlit Cloud, Render  
-- Evaluation: Accuracy, Precision, Recall, F1, ROC-AUC & confusion matrix
+
 
 ---
 
