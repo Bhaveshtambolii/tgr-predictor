@@ -97,7 +97,7 @@ st.markdown("""
             box-shadow: 0 4px 15px rgba(0, 224, 255, 0.4) !important;
         }
 
-        /* Glass container with fill and break animation */
+        /* Glass container */
         .glass-container {
             background: rgba(255, 255, 255, 0.1);
             border-radius: 20px;
@@ -122,6 +122,7 @@ st.markdown("""
             bottom: 0;
             left: 0;
             right: 0;
+            height: 100%;
             background: linear-gradient(180deg, rgba(0, 224, 255, 0.3), rgba(0, 119, 255, 0.5));
             animation: fillGlass 2s ease-out forwards;
             z-index: 1;
@@ -137,7 +138,7 @@ st.markdown("""
                 transform: scale(1.02);
             }
             100% { 
-                transform: scale(1.15) translateY(-20px);
+                transform: scale(1.15) translateY(-30px);
                 opacity: 0;
             }
         }
@@ -163,6 +164,7 @@ st.markdown("""
 
         .glass-breaking {
             animation: shatter 1s ease-in-out forwards;
+            pointer-events: none;
         }
 
         .glass-breaking::before {
@@ -180,31 +182,6 @@ st.markdown("""
             animation: crackLines 1s ease-in-out forwards;
             z-index: 10;
             pointer-events: none;
-        }
-
-        .glass-breaking::after {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            animation: fadeOut 1s ease-in-out forwards;
-        }
-
-        @keyframes fadeOut {
-            0% { opacity: 1; }
-            90% { opacity: 0.1; }
-            100% { 
-                opacity: 0;
-                visibility: hidden;
-                display: none;
-            }
-        }
-
-        /* Fade out glass smoothly */
-        .glass-hidden {
-            display: none;
         }
 
         /* Result reveal animation */
@@ -240,22 +217,6 @@ st.markdown("""
             margin: 0 auto;
             position: relative;
             overflow: hidden;
-        }
-
-        /* Success/Error messages */
-        .stSuccess, .stError {
-            background: rgba(255, 255, 255, 0.15) !important;
-            backdrop-filter: blur(10px) !important;
-            border-radius: 15px !important;
-            padding: 20px !important;
-            margin-top: 20px !important;
-            border: 2px solid rgba(255, 255, 255, 0.2) !important;
-        }
-
-        .stSuccess p, .stError p {
-            color: #ffffff !important;
-            font-size: 22px !important;
-            font-weight: 600 !important;
         }
 
         /* Processing state */
@@ -315,17 +276,13 @@ if 'prediction_done' not in st.session_state:
     st.session_state.prediction_done = False
 
 # --- MAIN UI ---
-# Determine if we should show the glass container
-show_glass = not st.session_state.show_result and not st.session_state.breaking
 
-# Determine glass container classes
-glass_classes = "glass-container"
-if st.session_state.breaking:
-    glass_classes = "glass-container glass-breaking"
-
-# Create container - show during initial state and processing, hide during breaking and result
-if show_glass or st.session_state.breaking:
-    # Add fill animation div
+# Show glass container only when NOT showing results
+if not st.session_state.show_result:
+    glass_classes = "glass-container"
+    if st.session_state.breaking:
+        glass_classes = "glass-container glass-breaking"
+    
     fill_div = '<div class="chemical-fill"></div>' if st.session_state.processing else ''
     
     st.markdown(f"""
@@ -341,13 +298,11 @@ if show_glass or st.session_state.breaking:
             </div>
         </div>
     """, unsafe_allow_html=True)
-
-if not st.session_state.show_result:
+    
     st.markdown("<div style='height: 20px;'></div>", unsafe_allow_html=True)
 
-# Input and prediction section
-# Only show input if not showing result
-if not st.session_state.show_result and not st.session_state.breaking:
+# Input and prediction section - show only when not processing/breaking/showing result
+if not st.session_state.show_result and not st.session_state.breaking and not st.session_state.processing:
     user_input = st.text_input("👉 Enter SMILES:", "", key="smiles_input")
 
     if st.button("Predict", key="predict_button"):
@@ -398,16 +353,6 @@ if st.session_state.breaking and not st.session_state.show_result:
 
 # Show result in place of glass
 if st.session_state.show_result and st.session_state.prediction_done:
-    # Add JavaScript to ensure glass is completely removed from DOM
-    st.markdown("""
-        <script>
-        const glass = document.getElementById('glassContainer');
-        if (glass) {
-            glass.style.display = 'none';
-        }
-        </script>
-    """, unsafe_allow_html=True)
-    
     st.markdown('<div class="result-container result-reveal">', unsafe_allow_html=True)
     
     if st.session_state.result_text == "error":
