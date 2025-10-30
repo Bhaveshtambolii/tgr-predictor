@@ -119,8 +119,11 @@ st.markdown("""
 
 
 # --- MAIN UI ---
-st.markdown("<div class='main-card'>", unsafe_allow_html=True)
-st.markdown("<div class='main-card'>🧪 TGR Activity Predictor</div>", unsafe_allow_html=True)
+st.markdown("""
+    <div class='main-card'>
+        <div class='title'>🧪 TGR Activity Predictor</div>
+    </div>
+""", unsafe_allow_html=True)
 st.markdown("<div class='subtitle'>Predict whether a compound is <b>Active</b> or <b>Inactive</b> against Thioredoxin Glutathione Reductase (TGR).</div>", unsafe_allow_html=True)
 
 user_input = st.text_input("👉 Enter SMILES:", "")
