@@ -182,6 +182,26 @@ st.markdown("""
             pointer-events: none;
         }
 
+        .glass-breaking::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            animation: fadeOut 1s ease-in-out forwards;
+        }
+
+        @keyframes fadeOut {
+            0% { opacity: 1; }
+            90% { opacity: 0.1; }
+            100% { 
+                opacity: 0;
+                visibility: hidden;
+                display: none;
+            }
+        }
+
         /* Fade out glass smoothly */
         .glass-hidden {
             display: none;
@@ -296,39 +316,38 @@ if 'prediction_done' not in st.session_state:
 
 # --- MAIN UI ---
 # Determine if we should show the glass container
-show_glass = not st.session_state.show_result
+show_glass = not st.session_state.show_result and not st.session_state.breaking
 
 # Determine glass container classes
 glass_classes = "glass-container"
 if st.session_state.breaking:
     glass_classes = "glass-container glass-breaking"
 
-# Create container only if not showing result
-if show_glass:
+# Create container - show during initial state and processing, hide during breaking and result
+if show_glass or st.session_state.breaking:
+    # Add fill animation div
+    fill_div = '<div class="chemical-fill"></div>' if st.session_state.processing else ''
+    
     st.markdown(f"""
         <div class='{glass_classes}' id='glassContainer'>
-            {'<div class="chemical-fill"></div>' if st.session_state.processing else ''}
+            {fill_div}
             <div class='content-layer'>
-                <div style='
-                    font-size: 2.2em;
-                    font-weight: 600;
-                    color: #00e0ff;
-                    margin-bottom: 10px;
-                '>🧪 TGR Activity Predictor</div>
-                <div style='
-                    font-size: 1.1em;
-                    color: #cceeff;
-                    margin-bottom: 30px;
-                '>Predict whether a compound is <b>Active</b> or <b>Inactive</b> against Thioredoxin Glutathione Reductase (TGR).</div>
+                <div style='font-size: 2.2em; font-weight: 600; color: #00e0ff; margin-bottom: 10px;'>
+                    🧪 TGR Activity Predictor
+                </div>
+                <div style='font-size: 1.1em; color: #cceeff; margin-bottom: 30px;'>
+                    Predict whether a compound is <b>Active</b> or <b>Inactive</b> against Thioredoxin Glutathione Reductase (TGR).
+                </div>
             </div>
         </div>
     """, unsafe_allow_html=True)
 
+if not st.session_state.show_result:
     st.markdown("<div style='height: 20px;'></div>", unsafe_allow_html=True)
 
 # Input and prediction section
 # Only show input if not showing result
-if not st.session_state.show_result:
+if not st.session_state.show_result and not st.session_state.breaking:
     user_input = st.text_input("👉 Enter SMILES:", "", key="smiles_input")
 
     if st.button("Predict", key="predict_button"):
@@ -338,6 +357,7 @@ if not st.session_state.show_result:
             # Start processing - trigger fill animation
             st.session_state.processing = True
             st.session_state.show_result = False
+            st.session_state.breaking = False
             st.session_state.prediction_done = False
             st.session_state.user_smiles = user_input
             st.rerun()
@@ -378,6 +398,16 @@ if st.session_state.breaking and not st.session_state.show_result:
 
 # Show result in place of glass
 if st.session_state.show_result and st.session_state.prediction_done:
+    # Add JavaScript to ensure glass is completely removed from DOM
+    st.markdown("""
+        <script>
+        const glass = document.getElementById('glassContainer');
+        if (glass) {
+            glass.style.display = 'none';
+        }
+        </script>
+    """, unsafe_allow_html=True)
+    
     st.markdown('<div class="result-container result-reveal">', unsafe_allow_html=True)
     
     if st.session_state.result_text == "error":
