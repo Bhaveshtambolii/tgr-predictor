@@ -4,10 +4,10 @@ import numpy as np
 from rdkit import Chem
 from rdkit.Chem import AllChem
 
-# Load trained Random Forest model
+# Load the trained Random Forest model
 model = joblib.load("random_forest_tgr.pkl")
 
-# Convert SMILES to fingerprint
+# Function to convert SMILES to fingerprint
 def smiles_to_fp(smiles):
     mol = Chem.MolFromSmiles(smiles)
     if mol:
@@ -15,181 +15,130 @@ def smiles_to_fp(smiles):
     else:
         return None
 
+
 # --- PAGE CONFIG ---
 st.set_page_config(page_title="TGR Activity AI", page_icon="🧪", layout="centered")
 
 # --- CUSTOM CSS ---
 st.markdown("""
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap');
-
-        body {
-            background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
-            font-family: 'Poppins', sans-serif;
-            color: white;
-        }
-
+        /* Page background */
         [data-testid="stAppViewContainer"] {
             background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
         }
 
         [data-testid="stHeader"] {
             background: rgba(0,0,0,0);
         }
 
-        /* --- Glass Card --- */
-        .glass-card {
-            background: rgba(255, 255, 255, 0.1);
-            backdrop-filter: blur(15px);
+        /* Centered glass box */
+        .main-card {
+            background: rgba(255, 255, 255, 0.12);
+            border: 2px solid rgba(255, 255, 255, 0.25);
             border-radius: 20px;
-            border: 1px solid rgba(255, 255, 255, 0.25);
-            box-shadow: 0 8px 32px rgba(0,0,0,0.4);
-            padding: 60px 50px;
-            margin: 80px auto;
+            padding: 50px 40px;
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.5);
             text-align: center;
-            max-width: 650px;
-            animation: fadeIn 1.2s ease forwards;
+            backdrop-filter: blur(20px);
+            color: #fff;
+            width: 90%;
+            max-width: 600px;
+            margin: auto;
         }
 
-        /* --- Title --- */
+        /* Title */
         .title {
-            font-size: 2.6rem;
+            font-size: 2.4em;
             font-weight: 700;
             color: #00e0ff;
-            margin-bottom: 15px;
-            text-shadow: 0 0 25px rgba(0, 224, 255, 0.6);
-            letter-spacing: 0.5px;
+            margin-bottom: 10px;
         }
 
-        /* --- Subtitle --- */
+        /* Subtext */
         .subtitle {
-            font-size: 1.1rem;
-            color: #cceeff;
-            margin-bottom: 55px;
-            line-height: 1.7;
-            animation: fadeInUp 1.2s ease;
+            font-size: 1.1em;
+            color: #d9f2ff;
+            margin-bottom: 35px;
         }
 
-        /* --- Input field --- */
-        .stTextInput > div > div > input {
-            background: rgba(255, 255, 255, 0.95);
-            border-radius: 12px;
-            padding: 14px 18px;
-            font-size: 1rem;
-            border: 2px solid rgba(0, 224, 255, 0.4);
-            transition: all 0.3s ease;
+        /* Input box */
+        .stTextInput>div>div>input {
+            border-radius: 10px;
+            background: rgba(255,255,255,0.95);
+            color: black;
+            font-size: 1.05em;
+            padding: 10px;
         }
 
-        .stTextInput > div > div > input:focus {
-            border-color: #00e0ff;
-            box-shadow: 0 0 20px rgba(0, 224, 255, 0.6);
-        }
-
-        /* --- Button --- */
-        .stButton > button {
+        /* Predict button */
+        .stButton>button {
             background: linear-gradient(90deg, #00e0ff, #0077ff);
             color: white;
-            font-weight: 700;
-            border: none;
+            font-weight: bold;
             border-radius: 12px;
-            padding: 12px 25px;
-            font-size: 1.1rem;
-            transition: all 0.3s ease;
-            margin-top: 40px;
-            box-shadow: 0 4px 15px rgba(0, 224, 255, 0.3);
+            padding: 0.6em 1.4em;
+            border: none;
+            transition: 0.3s;
+            font-size: 1em;
         }
 
-        .stButton > button:hover {
+        .stButton>button:hover {
             background: linear-gradient(90deg, #0077ff, #00e0ff);
-            transform: translateY(-3px);
-            box-shadow: 0 6px 25px rgba(0, 224, 255, 0.5);
+            transform: scale(1.05);
         }
 
-        /* --- Success / Error --- */
-        .stSuccess {
-            background: rgba(40, 200, 100, 0.15) !important;
-            border: 2px solid rgba(40, 200, 100, 0.5) !important;
-            border-radius: 12px !important;
-            padding: 18px !important;
-            color: #a8e6cf !important;
-            font-weight: 600 !important;
-            margin-top: 30px !important;
-            text-align: center;
-        }
-
-        .stError {
-            background: rgba(255, 80, 80, 0.15) !important;
-            border: 2px solid rgba(255, 80, 80, 0.5) !important;
-            border-radius: 12px !important;
-            padding: 18px !important;
-            color: #ffb3b3 !important;
-            font-weight: 600 !important;
-            margin-top: 30px !important;
-            text-align: center;
-        }
-
-        /* --- Chat Icon --- */
+        /* Floating chat icon */
         .chat-icon {
             position: fixed;
-            bottom: 30px;
-            right: 30px;
-            background: linear-gradient(135deg, #00e0ff, #0077ff);
-            width: 65px;
-            height: 65px;
+            bottom: 25px;
+            right: 25px;
+            background: linear-gradient(135deg, #0077ff, #00e0ff);
             border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 30px;
-            box-shadow: 0 6px 25px rgba(0, 224, 255, 0.5);
-            transition: all 0.3s ease;
+            width: 60px;
+            height: 60px;
+            color: white;
+            font-size: 28px;
+            text-align: center;
+            line-height: 60px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
             cursor: pointer;
             z-index: 999;
+            transition: transform 0.3s ease;
         }
 
         .chat-icon:hover {
-            transform: scale(1.1) rotate(5deg);
-            box-shadow: 0 8px 35px rgba(0, 224, 255, 0.7);
-        }
-
-        /* --- Animations --- */
-        @keyframes fadeIn {
-            from {opacity: 0;}
-            to {opacity: 1;}
-        }
-        @keyframes fadeInUp {
-            0% {opacity: 0; transform: translateY(25px);}
-            100% {opacity: 1; transform: translateY(0);}
+            transform: scale(1.1);
         }
     </style>
 """, unsafe_allow_html=True)
 
-# --- MAIN CARD ---
-st.markdown("<div class='glass-card'>", unsafe_allow_html=True)
+
+
+# --- MAIN UI ---
+st.markdown("<div class='main-card'>", unsafe_allow_html=True)
 st.markdown("<div class='title'>🧪 TGR Activity Predictor</div>", unsafe_allow_html=True)
 st.markdown("<div class='subtitle'>Predict whether a compound is <b>Active</b> or <b>Inactive</b> against Thioredoxin Glutathione Reductase (TGR).</div>", unsafe_allow_html=True)
 
-user_input = st.text_input("👉 Enter SMILES:", "", placeholder="e.g., CCO or CC(=O)O")
+user_input = st.text_input("👉 Enter SMILES:", "")
 
-if st.button("🔬 Predict Activity"):
-    if not user_input or user_input.strip() == "":
-        st.error("⚠️ Please enter a valid SMILES string.")
+if st.button("Predict"):
+    fp = smiles_to_fp(user_input)
+    if fp is None:
+        st.error("Invalid SMILES string. Please try again.")
     else:
-        fp = smiles_to_fp(user_input)
-        if fp is None:
-            st.error("❌ Invalid SMILES string. Please check your input.")
-        else:
-            prediction = model.predict(fp)[0]
-            if prediction == 1:
-                st.success("**Prediction: 🟢 Active**")
-            else:
-                st.success("**Prediction: 🔴 Inactive**")
+        prediction = model.predict(fp)[0]
+        activity = "🟢 Active" if prediction == 1 else "🔴 Inactive"
+        st.success(f"Prediction: **{activity}**")
 
 st.markdown("</div>", unsafe_allow_html=True)
 
 # --- Floating Chatbot Icon ---
 st.markdown("""
-    <div class="chat-icon" title="Chat Assistant">
+    <div class="chat-icon" title="Open Chat">
         💬
     </div>
 """, unsafe_allow_html=True)
