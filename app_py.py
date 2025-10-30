@@ -37,26 +37,15 @@ st.markdown("""
 
         /* Centered glass box */
        
-    .main-card {
-        background: rgba(255, 255, 255, 0.1);
-        border-radius: 20px;
-        padding: 2rem;
-        margin: 3rem auto;
-        box-shadow: 0 4px 25px rgba(0, 0, 0, 0.4);
-        text-align: center;
-        backdrop-filter: blur(12px);
-        color: #fff;
-        max-width: 600px;
-        width: 90%;
-    }
-    
-    .title {
-        font-size: 2em;
-        font-weight: 600;
-        color: #00e0ff;
-        margin-bottom: 0.4em;
-        word-wrap: break-word;
-        line-height: 1.2em;
+      .main-card {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 20px;
+            box-shadow: 0 4px 25px rgba(0, 0, 0, 0.4);
+            text-align: center;
+            backdrop-filter: blur(12px);
+            color: #fff;
+            max-width: 600px;
+            margin: 50px auto;
         }
 
         /* Subtext */
@@ -123,9 +112,9 @@ st.markdown("""
 st.markdown("""
     <div class='main-card'>
         <div class='title'>🧪 TGR Activity Predictor</div>
+        <div class='subtitle'>Predict whether a compound is <b>Active</b> or <b>Inactive</b> against Thioredoxin Glutathione Reductase (TGR).</div>
     </div>
 """, unsafe_allow_html=True)
-st.markdown("<div class='subtitle'>Predict whether a compound is <b>Active</b> or <b>Inactive</b> against Thioredoxin Glutathione Reductase (TGR).</div>", unsafe_allow_html=True)
 
 user_input = st.text_input("👉 Enter SMILES:", "")
 
