@@ -36,26 +36,27 @@ st.markdown("""
         }
 
         /* Centered glass box */
-        .main-card {
-            background: rgba(255, 255, 255, 0.12);
-            border: 2px solid rgba(255, 255, 255, 0.25);
-            border-radius: 20px;
-            padding: 50px 40px;
-            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.5);
-            text-align: center;
-            backdrop-filter: blur(20px);
-            color: #fff;
-            width: 90%;
-            max-width: 600px;
-            margin: auto;
-        }
-
-        /* Title */
-        .title {
-            font-size: 2.4em;
-            font-weight: 700;
-            color: #00e0ff;
-            margin-bottom: 10px;
+       
+    .main-card {
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 20px;
+        padding: 2rem;
+        margin: 3rem auto;
+        box-shadow: 0 4px 25px rgba(0, 0, 0, 0.4);
+        text-align: center;
+        backdrop-filter: blur(12px);
+        color: #fff;
+        max-width: 600px;
+        width: 90%;
+    }
+    
+    .title {
+        font-size: 2em;
+        font-weight: 600;
+        color: #00e0ff;
+        margin-bottom: 0.4em;
+        word-wrap: break-word;
+        line-height: 1.2em;
         }
 
         /* Subtext */
