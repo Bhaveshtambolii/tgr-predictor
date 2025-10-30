@@ -119,24 +119,33 @@ st.markdown("""
 
 
 # --- MAIN UI ---
-st.markdown("<div class='main-card'>", unsafe_allow_html=True)
-st.markdown("<div class='title'>🧪 TGR Activity Predictor</div>", unsafe_allow_html=True)
-st.markdown("<div class='subtitle'>Predict whether a compound is <b>Active</b> or <b>Inactive</b> against Thioredoxin Glutathione Reductase (TGR).</div>", unsafe_allow_html=True)
+st.markdown("""
+    <div class='main-card'>
+        <div class='title'>🧪 TGR Activity Predictor</div>
+        <div class='subtitle'>
+            Predict whether a compound is <b>Active</b> or <b>Inactive</b> 
+            against <b>Thioredoxin Glutathione Reductase (TGR)</b>.
+        </div>
+""", unsafe_allow_html=True)
 
+# Keep Streamlit widgets inside the card using markdown closing later
 user_input = st.text_input("👉 Enter SMILES:", "")
 
-if st.button("Predict"):
+predict_btn = st.button("Predict")
+
+if predict_btn:
     fp = smiles_to_fp(user_input)
     if fp is None:
-        st.error("Invalid SMILES string. Please try again.")
+        st.error("❌ Invalid SMILES string. Please try again.")
     else:
         prediction = model.predict(fp)[0]
         activity = "🟢 Active" if prediction == 1 else "🔴 Inactive"
-        st.success(f"Prediction: **{activity}**")
+        st.success(f"**Prediction: {activity}**")
 
+# Close the glass card container
 st.markdown("</div>", unsafe_allow_html=True)
 
-# --- Floating Chatbot Icon ---
+# Floating Chat Icon
 st.markdown("""
     <div class="chat-icon" title="Open Chat">
         💬
