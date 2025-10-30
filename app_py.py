@@ -17,226 +17,246 @@ def smiles_to_fp(smiles):
 
 
 # --- PAGE CONFIG ---
-st.set_page_config(page_title="TGR Activity AI", page_icon="🧪", layout="centered")
+st.set_page_config(page_title="TGR Activity AI", page_icon="🧪", layout="wide")
 
 # --- CUSTOM CSS ---
 st.markdown("""
     <style>
-        /* General page background and font */
-        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap');
         
-        body {
-            background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
-            color: white;
-            font-family: 'Poppins', sans-serif;
+        /* Remove all default Streamlit padding and margins */
+        .main .block-container {
+            padding: 0 !important;
+            max-width: 100% !important;
         }
         
+        /* Full page background */
         [data-testid="stAppViewContainer"] {
             background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
         }
-
+        
         [data-testid="stHeader"] {
             background: rgba(0,0,0,0);
         }
         
-        /* Hide default Streamlit elements */
+        /* Hide Streamlit branding */
         #MainMenu {visibility: hidden;}
         footer {visibility: hidden;}
+        header {visibility: hidden;}
         
-        /* Hide default spacing */
-        .block-container {
-            padding-top: 2rem;
-            padding-bottom: 0rem;
-        }
-
-        /* Container wrapper for the glass card */
-        .glass-container {
+        /* Full page wrapper */
+        .app-wrapper {
+            min-height: 100vh;
             display: flex;
-            justify-content: center;
             align-items: center;
-            min-height: 70vh;
-            padding: 20px;
+            justify-content: center;
+            padding: 40px 20px;
+            font-family: 'Poppins', sans-serif;
         }
-
-        /* Center Card - Glass Effect */
-        .main-card {
+        
+        /* Glass card container */
+        .glass-card {
             background: rgba(255, 255, 255, 0.1);
-            border-radius: 20px;
-            padding: 40px 50px;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
-            backdrop-filter: blur(12px);
-            -webkit-backdrop-filter: blur(12px);
-            border: 1px solid rgba(255, 255, 255, 0.18);
-            color: #fff;
-            max-width: 650px;
+            backdrop-filter: blur(15px);
+            -webkit-backdrop-filter: blur(15px);
+            border-radius: 25px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+            padding: 50px 60px;
+            max-width: 700px;
             width: 100%;
         }
-
-        /* Title */
-        .title {
-            font-size: 2.5em;
-            font-weight: 600;
+        
+        /* Title styling */
+        .app-title {
+            font-size: 2.8em;
+            font-weight: 700;
             color: #00e0ff;
+            text-align: center;
             margin-bottom: 15px;
-            text-align: center;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 10px;
+            text-shadow: 0 0 20px rgba(0, 224, 255, 0.5);
         }
-
-        /* Subtext */
-        .subtitle {
-            font-size: 1.05em;
+        
+        /* Subtitle styling */
+        .app-subtitle {
+            font-size: 1.1em;
             color: #cceeff;
-            margin-bottom: 35px;
             text-align: center;
-            line-height: 1.6;
+            line-height: 1.7;
+            margin-bottom: 40px;
         }
-
-        /* Input section */
-        .input-section {
+        
+        /* Input container */
+        .input-container {
             margin: 30px 0;
         }
-
-        /* Input label styling */
-        .input-label {
-            color: #cceeff;
-            font-weight: 500;
-            font-size: 1.05em;
-            margin-bottom: 10px;
-            display: block;
-        }
-
-        /* Streamlit input box styling */
-        .stTextInput>div>div>input {
-            border-radius: 12px;
-            background: rgba(255,255,255,0.95);
-            color: #1a1a1a;
-            border: 2px solid rgba(0, 224, 255, 0.3);
-            padding: 12px 15px;
-            font-size: 1em;
-            transition: all 0.3s ease;
+        
+        /* Button container */
+        .button-container {
+            margin: 25px 0;
         }
         
-        .stTextInput>div>div>input:focus {
-            border-color: #00e0ff;
-            box-shadow: 0 0 15px rgba(0, 224, 255, 0.5);
-            background: rgba(255,255,255,1);
+        /* Result container */
+        .result-container {
+            margin-top: 25px;
+            text-align: center;
         }
         
-        /* Input label from Streamlit */
-        .stTextInput>label {
-            color: #cceeff !important;
-            font-weight: 500 !important;
-            font-size: 1.05em !important;
-            margin-bottom: 8px !important;
-        }
-
-        /* Predict button */
-        .stButton>button {
-            background: linear-gradient(90deg, #00e0ff, #0077ff);
-            color: white;
-            font-weight: bold;
-            font-size: 1.1em;
-            border-radius: 12px;
-            padding: 0.7em 2em;
-            border: none;
-            transition: all 0.3s ease;
-            width: 100%;
-            margin-top: 20px;
-            cursor: pointer;
-        }
-
-        .stButton>button:hover {
-            background: linear-gradient(90deg, #0077ff, #00e0ff);
-            transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(0, 224, 255, 0.4);
-        }
-        
-        .stButton>button:active {
-            transform: translateY(0);
-        }
-        
-        /* Success/Error messages */
-        .stSuccess {
-            background: rgba(40, 167, 69, 0.2) !important;
-            border: 1px solid rgba(40, 167, 69, 0.4) !important;
-            border-radius: 12px !important;
-            padding: 15px !important;
-            margin-top: 20px !important;
-            color: #d4edda !important;
-        }
-        
-        .stError {
-            background: rgba(220, 53, 69, 0.2) !important;
-            border: 1px solid rgba(220, 53, 69, 0.4) !important;
-            border-radius: 12px !important;
-            padding: 15px !important;
-            margin-top: 20px !important;
-            color: #f8d7da !important;
-        }
-
-        /* Chatbot floating icon */
+        /* Chatbot icon */
         .chat-icon {
             position: fixed;
-            bottom: 30px;
-            right: 30px;
-            background: linear-gradient(135deg, #0077ff, #00e0ff);
+            bottom: 35px;
+            right: 35px;
+            background: linear-gradient(135deg, #00e0ff, #0077ff);
+            width: 70px;
+            height: 70px;
             border-radius: 50%;
-            width: 65px;
-            height: 65px;
-            color: white;
-            font-size: 30px;
             display: flex;
             align-items: center;
             justify-content: center;
-            box-shadow: 0 6px 20px rgba(0, 120, 255, 0.4);
+            font-size: 32px;
             cursor: pointer;
-            z-index: 999;
+            box-shadow: 0 6px 24px rgba(0, 224, 255, 0.5);
             transition: all 0.3s ease;
+            z-index: 9999;
         }
-
+        
         .chat-icon:hover {
-            transform: scale(1.1);
-            box-shadow: 0 8px 25px rgba(0, 224, 255, 0.6);
+            transform: scale(1.1) rotate(5deg);
+            box-shadow: 0 8px 30px rgba(0, 224, 255, 0.7);
         }
     </style>
 """, unsafe_allow_html=True)
 
+# --- START OF GLASS CARD ---
+st.markdown("""
+    <div class="app-wrapper">
+        <div class="glass-card">
+            <div class="app-title">
+                🧪 TGR Activity Predictor
+            </div>
+            <div class="app-subtitle">
+                Predict whether a compound is <strong>Active</strong> or <strong>Inactive</strong> against Thioredoxin Glutathione Reductase (TGR).
+            </div>
+""", unsafe_allow_html=True)
 
-# --- MAIN UI USING CONTAINER ---
-# Create a container that will hold everything inside the glass card
-st.markdown('<div class="glass-container">', unsafe_allow_html=True)
-st.markdown('<div class="main-card">', unsafe_allow_html=True)
+# Input field with custom styling
+st.markdown('<div class="input-container">', unsafe_allow_html=True)
 
-# Title and subtitle - now these will be inside the card
-st.markdown('<div class="title">🧪 TGR Activity Predictor</div>', unsafe_allow_html=True)
-st.markdown('<div class="subtitle">Predict whether a compound is <b>Active</b> or <b>Inactive</b> against Thioredoxin Glutathione Reductase (TGR).</div>', unsafe_allow_html=True)
+# Custom CSS for input field to match the design
+st.markdown("""
+    <style>
+        /* Style the input field */
+        .stTextInput > div > div > input {
+            background: rgba(255, 255, 255, 0.95);
+            border: 2px solid rgba(0, 224, 255, 0.4);
+            border-radius: 15px;
+            padding: 15px 20px;
+            font-size: 1em;
+            color: #1a1a1a;
+            transition: all 0.3s ease;
+        }
+        
+        .stTextInput > div > div > input:focus {
+            background: rgba(255, 255, 255, 1);
+            border-color: #00e0ff;
+            box-shadow: 0 0 20px rgba(0, 224, 255, 0.6);
+            outline: none;
+        }
+        
+        .stTextInput label {
+            color: #cceeff !important;
+            font-weight: 600 !important;
+            font-size: 1.1em !important;
+            margin-bottom: 10px !important;
+        }
+        
+        /* Style the button */
+        .stButton > button {
+            background: linear-gradient(90deg, #00e0ff, #0077ff);
+            color: white;
+            font-weight: 700;
+            font-size: 1.15em;
+            border: none;
+            border-radius: 15px;
+            padding: 15px 40px;
+            width: 100%;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        
+        .stButton > button:hover {
+            background: linear-gradient(90deg, #0077ff, #00e0ff);
+            transform: translateY(-3px);
+            box-shadow: 0 8px 25px rgba(0, 224, 255, 0.5);
+        }
+        
+        .stButton > button:active {
+            transform: translateY(-1px);
+        }
+        
+        /* Style success message */
+        .stSuccess {
+            background: rgba(40, 200, 100, 0.15) !important;
+            border: 2px solid rgba(40, 200, 100, 0.5) !important;
+            border-radius: 15px !important;
+            padding: 20px !important;
+            color: #a8e6cf !important;
+            font-size: 1.2em !important;
+            font-weight: 600 !important;
+            text-align: center !important;
+        }
+        
+        /* Style error message */
+        .stError {
+            background: rgba(255, 80, 80, 0.15) !important;
+            border: 2px solid rgba(255, 80, 80, 0.5) !important;
+            border-radius: 15px !important;
+            padding: 20px !important;
+            color: #ffb3b3 !important;
+            font-size: 1.1em !important;
+            font-weight: 600 !important;
+            text-align: center !important;
+        }
+    </style>
+""", unsafe_allow_html=True)
 
-# Input field
-user_input = st.text_input("👉 Enter SMILES:", "", key="smiles_input")
+user_input = st.text_input("👉 Enter SMILES:", "", placeholder="e.g., CCO or CC(=O)O")
 
-# Predict button
-if st.button("Predict"):
+st.markdown('</div>', unsafe_allow_html=True)
+
+# Button
+st.markdown('<div class="button-container">', unsafe_allow_html=True)
+predict_button = st.button("🔬 Predict Activity")
+st.markdown('</div>', unsafe_allow_html=True)
+
+# Prediction logic
+if predict_button:
     if not user_input or user_input.strip() == "":
         st.error("⚠️ Please enter a valid SMILES string.")
     else:
-        fp = smiles_to_fp(user_input)
-        if fp is None:
-            st.error("❌ Invalid SMILES string. Please check your input and try again.")
-        else:
-            prediction = model.predict(fp)[0]
-            activity = "🟢 Active" if prediction == 1 else "🔴 Inactive"
-            st.success(f"**Prediction:** {activity}")
+        with st.spinner("Analyzing compound..."):
+            fp = smiles_to_fp(user_input)
+            if fp is None:
+                st.error("❌ Invalid SMILES string. Please check your input and try again.")
+            else:
+                prediction = model.predict(fp)[0]
+                if prediction == 1:
+                    st.success("**Prediction: 🟢 Active**")
+                else:
+                    st.success("**Prediction: 🔴 Inactive**")
 
-# Close the containers
-st.markdown('</div>', unsafe_allow_html=True)  # Close main-card
-st.markdown('</div>', unsafe_allow_html=True)  # Close glass-container
+# --- END OF GLASS CARD ---
+st.markdown("""
+        </div>
+    </div>
+""", unsafe_allow_html=True)
 
 # --- Floating Chatbot Icon ---
 st.markdown("""
-    <div class="chat-icon" title="Open Chat">
+    <div class="chat-icon" title="Chat Assistant">
         💬
     </div>
 """, unsafe_allow_html=True)
