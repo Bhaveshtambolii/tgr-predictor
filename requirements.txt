@@ -1,3 +1,7 @@
+streamlit
+langchain_groq
+dotenv
+langchain
 rdkit==2024.9.2
 pandas
 numpy
@@ -6,6 +10,7 @@ joblib
 matplotlib
 seaborn
 streamlit
+
 
 
 
