@@ -47,6 +47,15 @@ st.markdown("""
             max-width: 600px;
             margin: 50px auto;
         }
+        
+        .title {
+        font-size: 2em;
+        font-weight: 600;
+        color: #00e0ff;
+        margin-bottom: 0.4em;
+        word-wrap: break-word;
+        line-height: 1.2em;
+    }
 
         /* Subtext */
         .subtitle {
