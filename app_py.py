@@ -3,6 +3,19 @@ import joblib
 import numpy as np
 from rdkit import Chem
 from rdkit.Chem import AllChem
+from langchain_groq import ChatGroq
+from langchain_core.output_parsers import StrOutputParser
+from langchain_core.prompts import ChatPromptTemplate
+
+import os
+from dotenv import load_dotenv
+load_dotenv()
+
+## Langsmith Tracking
+os.environ['LANGCHAIN_API_KEY'] = os.getenv("LC_API_KEY")
+os.environ["LANGCHAIN_TRACING_V2"] = "true"
+os.environ["LANGCHAIN_PROJECT"] = "Chat bot for TGR Activity Predictor"
+q_api_key = os.getenv("Q_API_KEY")
 
 # Load the trained Random Forest model
 model = joblib.load("random_forest_tgr.pkl")
@@ -15,56 +28,87 @@ def smiles_to_fp(smiles):
     else:
         return None
 
+## Prompt template for chatbot
+prompt = ChatPromptTemplate.from_messages(
+    [
+        ("system", """You are a helpful assistant for the TGR Activity Predictor application. Your role is to help users understand how to use the predictor, explain features, answer questions about TGR (Thioredoxin Glutathione Reductase), guide them through the prediction process, and provide general assistance. You do not make predictions yourself - the prediction model does that.
+
+Additional capabilities:
+1. If a user provides a SMILES notation (like c1ccccc1, CCO, CC(=O)O, etc.), identify and tell them the name of the compound.
+2. If a user provides the name of a chemical compound (like benzene, ethanol, aspirin, etc.), generate its SMILES notation.
+
+Please respond to user queries in a friendly and helpful manner."""),
+        ("user", "Question:{question}")
+    ]
+)
+
+def generate_response(question, api_key):
+    if not api_key:
+        return "⚠️ Please configure your Groq API Key in the settings above to use the chatbot."
+
+    try:
+        model_chat = ChatGroq(
+            model="llama-3.1-8b-instant",
+            groq_api_key=api_key
+        )
+        output_parser = StrOutputParser()
+        chain = prompt | model_chat | output_parser
+        answer = chain.invoke({'question': question})
+        return answer
+    except Exception as e:
+        return f"❌ Error: {str(e)}. Please check your API key in settings."
+
 
 # --- PAGE CONFIG ---
-st.set_page_config(page_title="TGR Activity AI", page_icon="🧪", layout="centered")
+st.set_page_config(page_title="TGR Activity AI", page_icon="🧪", layout="wide", initial_sidebar_state="expanded")
 
 # --- CUSTOM CSS ---
 st.markdown("""
     <style>
-<style>
-        /* Reset */
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
+        /* General page background and font */
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
-            margin: 0;
-            padding: 0;
-        }
-
-        /* Page background */
-        .app-container {
             background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            min-height: 100vh;
-            padding: 20px;
+            color: white;
+            font-family: 'Poppins', sans-serif;
+        }
+        [data-testid="stAppViewContainer"] {
+            background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
         }
 
-        /* Centered glass box */
+        [data-testid="stHeader"] {
+            background: rgba(0,0,0,0);
+        }
+        
+        /* Sidebar styling - Always open with fixed width */
+        [data-testid="stSidebar"] {
+            background: linear-gradient(180deg, #1a1a2e, #16213e);
+            min-width: 400px !important;
+            max-width: 400px !important;
+            width: 400px !important;
+        }
+        
+        [data-testid="stSidebar"] > div:first-child {
+            width: 400px !important;
+        }
+        
+        /* Hide sidebar collapse button */
+        [data-testid="collapsedControl"] {
+            display: none;
+        }
+        
+        [data-testid="stSidebar"] [data-testid="stMarkdownContainer"] {
+            color: white;
+        }
+
+        /* Center Card */
         .main-card {
-            background: rgba(255, 255, 255, 0.12);
-            border: 2px solid rgba(255, 255, 255, 0.25);
-            border-radius: 20px;
-            padding: 50px 40px;
-            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.5);
-            text-align: center;
-            backdrop-filter: blur(20px);
-            color: #fff;
-            width: 90%;
-            max-width: 600px;
-            margin: auto;
+         
         }
 
         /* Title */
         .title {
-            font-size: 2.4em;
-            font-weight: 700;
+            font-size: 2.2em;
+            font-weight: 600;
             color: #00e0ff;
             margin-bottom: 10px;
         }
@@ -72,37 +116,19 @@ st.markdown("""
         /* Subtext */
         .subtitle {
             font-size: 1.1em;
-            color: #d9f2ff;
-            margin-bottom: 35px;
-        }
-
-        /* Input label */
-        .input-label {
-            display: block;
-            text-align: left;
-            margin-bottom: 8px;
-            font-size: 1em;
-            color: #fff;
+            color: #cceeff;
+            margin-bottom: 30px;
         }
 
         /* Input box */
-        .input-box {
-            width: 100%;
+        .stTextInput>div>div>input {
             border-radius: 10px;
-            background: rgba(255,255,255,0.95);
+            background: rgba(255,255,255,0.9);
             color: black;
-            font-size: 1.05em;
-            padding: 10px;
-            border: none;
-            margin-bottom: 20px;
-        }
-
-        .input-box:focus {
-            outline: 2px solid #00e0ff;
         }
 
         /* Predict button */
-        .predict-button {
+        .stButton>button {
             background: linear-gradient(90deg, #00e0ff, #0077ff);
             color: white;
             font-weight: bold;
@@ -110,110 +136,136 @@ st.markdown("""
             padding: 0.6em 1.4em;
             border: none;
             transition: 0.3s;
-            font-size: 1em;
-            cursor: pointer;
-            margin-top: 10px;
         }
 
-        .predict-button:hover {
+        .stButton>button:hover {
             background: linear-gradient(90deg, #0077ff, #00e0ff);
             transform: scale(1.05);
         }
-
-        /* Result box */
-        .result-box {
-            margin-top: 25px;
-            padding: 15px;
-            border-radius: 10px;
+        
+        /* Chat message styling */
+        .stChatMessage {
             background: rgba(255, 255, 255, 0.1);
-            border: 1px solid rgba(255, 255, 255, 0.2);
-        }
-
-        .result-active {
-            color: #4cff4c;
-            font-size: 1.2em;
-            font-weight: bold;
-        }
-
-        .result-inactive {
-            color: #ff4c4c;
-            font-size: 1.2em;
-            font-weight: bold;
-        }
-
-        /* Floating chat icon */
-        .chat-icon {
-            position: fixed;
-            bottom: 25px;
-            right: 25px;
-            background: linear-gradient(135deg, #0077ff, #00e0ff);
-            border-radius: 50%;
-            width: 60px;
-            height: 60px;
-            color: white;
-            font-size: 28px;
-            text-align: center;
-            line-height: 60px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
-            cursor: pointer;
-            z-index: 999;
-            transition: transform 0.3s ease;
-        }
-
-        .chat-icon:hover {
-            transform: scale(1.1);
+            border-radius: 10px;
+            padding: 10px;
+            margin: 5px 0;
         }
     </style>
 """, unsafe_allow_html=True)
 
+# --- SIDEBAR CHATBOT ---
+with st.sidebar:
+    st.markdown("### 💬 AI Assistant")
+    st.markdown("---")
 
+    # Initialize session state variables
+    if "messages" not in st.session_state:
+        st.session_state.messages = []
+    if "groq_api_key" not in st.session_state:
+        st.session_state.groq_api_key = None  # No default API key
 
-# --- MAIN UI ---
-# --- MAIN UI ---
-st.markdown("""
-    <div class='app-container'>
-        <div class='main-card'>
-            <div class='title'>🧪 TGR Activity Predictor</div>
-            <div class='subtitle'>
-                Predict whether a compound is <b>Active</b> or <b>Inactive</b> against Thioredoxin Glutathione Reductase (TGR).
-            </div>
-        </div>
-    </div>
-""", unsafe_allow_html=True)
+    # API Key Configuration Section
+    with st.expander("🔑 API Key Settings", expanded=not st.session_state.groq_api_key):
+        st.markdown("**Groq API Key Configuration**")
+        st.caption("The chatbot requires your Groq API key to function.")
 
-# Input label
-st.markdown("<label class='input-label'>👉 Enter SMILES:</label>", unsafe_allow_html=True)
-
-# Text input
-user_input = st.text_input("", "", label_visibility="collapsed", key="smilesInput")
-
-# Predict button
-if st.button("Predict", key="predict_button"):
-    if not user_input:
-        st.error("Please enter a SMILES string.")
-    else:
-        fp = smiles_to_fp(user_input)
-        if fp is None:
-            st.markdown("""
-                <div class='result-box' style='display: block; background-color: #fee; border-left: 4px solid #f44;'>
-                    <div style='color: #c33;'>❌ Invalid SMILES string. Please try again.</div>
-                </div>
-            """, unsafe_allow_html=True)
+        # Show current status
+        if st.session_state.groq_api_key:
+            st.success("✓ API Key configured - Chatbot is ready!")
         else:
-            prediction = model.predict(fp)[0]
-            activity = "🟢 Active" if prediction == 1 else "🔴 Inactive"
-            bg_color = "#e8f5e9" if prediction == 1 else "#ffebee"
-            border_color = "#4caf50" if prediction == 1 else "#f44336"
-            
-            st.markdown(f"""
-                <div class='result-box' style='display: block; background-color: {bg_color}; border-left: 4px solid {border_color};'>
-                    <div id='resultText' style='font-size: 1.2em; font-weight: bold;'>Prediction: {activity}</div>
-                </div>
-            """, unsafe_allow_html=True)
+            st.warning("⚠ No API Key set - Chatbot is disabled")
 
-# Floating Chat Icon
-st.markdown("""
-<div class="chat-icon" title="Open Chat">
-    💬
-</div>
-""", unsafe_allow_html=True)
+        # API Key input
+        api_key_input = st.text_input(
+            "Enter your Groq API Key:",
+            value="",
+            type="password",
+            placeholder="gsk_...",
+            help="Get your free API key from https://console.groq.com/keys"
+        )
+
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("💾 Save Key", use_container_width=True):
+                if api_key_input:
+                    st.session_state.groq_api_key = api_key_input
+                    st.success("API Key saved!")
+                    st.rerun()
+                else:
+                    st.error("Please enter a valid API key")
+
+        with col2:
+            if st.button("🗑️ Clear Key", use_container_width=True):
+                st.session_state.groq_api_key = None
+                st.session_state.messages = []  # Clear chat history too
+                st.success("API Key cleared")
+                st.rerun()
+
+    # Information section at top
+    with st.expander("ℹ️ About Assistant"):
+        st.info("""
+        **I can help you with:**
+        - How to use the predictor
+        - Understanding TGR
+        - Convert SMILES ↔ Names
+        - Interpreting results
+
+        **Examples:**
+        - "What is c1ccccc1?"
+        - "SMILES for aspirin?"
+        - "How does TGR work?"
+        """)
+    
+    st.markdown("---")
+
+    # Check if API key is configured
+    if not st.session_state.groq_api_key:
+        st.info("💡 **Chatbot is disabled**\n\nPlease add your Groq API key in the settings above to start chatting.")
+    else:
+        # Display chat history with scrollable container
+        chat_container = st.container(height=400)
+        with chat_container:
+            for message in st.session_state.messages:
+                with st.chat_message(message["role"]):
+                    st.markdown(message["content"])
+
+        # Chat input at bottom (only shown when API key is set)
+        question = st.chat_input("Ask me anything...")
+
+        # Process new message
+        if question:
+            # Add user message to chat history
+            st.session_state.messages.append({"role": "user", "content": question})
+
+            # Generate and display assistant response
+            with st.spinner("Thinking..."):
+                response = generate_response(question, st.session_state.groq_api_key)
+
+            # Add assistant response to chat history
+            st.session_state.messages.append({"role": "assistant", "content": response})
+            st.rerun()
+
+        st.markdown("---")
+
+        if st.button("🗑️ Clear Chat"):
+            st.session_state.messages = []
+            st.rerun()
+
+
+# --- MAIN UI ---
+st.markdown("<div class='main-card'>", unsafe_allow_html=True)
+st.markdown("<div class='title'>🧪 TGR Activity Predictor</div>", unsafe_allow_html=True)
+st.markdown("<div class='subtitle'>Predict whether a compound is <b>Active</b> or <b>Inactive</b> against Thioredoxin Glutathione Reductase (TGR).</div>", unsafe_allow_html=True)
+
+user_input = st.text_input("👉 Enter SMILES:", "")
+
+if st.button("Predict"):
+    fp = smiles_to_fp(user_input)
+    if fp is None:
+        st.error("Invalid SMILES string. Please try again.")
+    else:
+        prediction = model.predict(fp)[0]
+        activity = "🟢 Active" if prediction == 1 else "🔴 Inactive"
+        st.success(f"Prediction: **{activity}**")
+
+st.markdown("</div>", unsafe_allow_html=True)
