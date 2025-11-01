@@ -12,9 +12,12 @@ from dotenv import load_dotenv
 load_dotenv()
 
 ## Langsmith Tracking
-os.environ['LANGCHAIN_API_KEY'] = os.getenv("LC_API_KEY")
-os.environ["LANGCHAIN_TRACING_V2"] = "true"
-os.environ["LANGCHAIN_PROJECT"] = "Chat bot for TGR Activity Predictor"
+lc_api_key = os.getenv("LC_API_KEY")
+if lc_api_key:
+    os.environ['LANGCHAIN_API_KEY'] = lc_api_key
+    os.environ["LANGCHAIN_TRACING_V2"] = "true"
+    os.environ["LANGCHAIN_PROJECT"] = "Chat bot for TGR Activity Predictor"
+
 q_api_key = os.getenv("Q_API_KEY")
 
 # Load the trained Random Forest model
