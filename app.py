@@ -1,4 +1,5 @@
 import streamlit as st
+import streamlit.components.v1 as components
 import joblib
 import numpy as np
 from rdkit import Chem
@@ -664,7 +665,7 @@ if predict_button:
             with result_col2:
                 if prediction == 1:
                     st.markdown("""
-                    <div class="chemical-fill-container" style="border-color: rgba(34, 197, 94, 0.5);">
+                    <div id="prediction-result" class="chemical-fill-container" style="border-color: rgba(34, 197, 94, 0.5);">
                         <div class="chemical-fill chemical-fill-active"></div>
                         <div class="bubbles">
                             <div class="bubble" style="left: 5%; width: 6px; height: 6px; animation-delay: 0s; animation-duration: 2.5s;"></div>
@@ -686,7 +687,7 @@ if predict_button:
                     """, unsafe_allow_html=True)
                 else:
                     st.markdown("""
-                    <div class="chemical-fill-container" style="border-color: rgba(239, 68, 68, 0.5);">
+                    <div id="prediction-result" class="chemical-fill-container" style="border-color: rgba(239, 68, 68, 0.5);">
                         <div class="chemical-fill chemical-fill-inactive"></div>
                         <div class="bubbles">
                             <div class="bubble" style="left: 8%; width: 7px; height: 7px; animation-delay: 0.5s; animation-duration: 2.3s;"></div>
@@ -715,6 +716,21 @@ if predict_button:
                 <code style="display: block; margin-top: 0.5rem; font-size: 1.1rem; color: #00e0ff; font-family: 'JetBrains Mono', monospace;">{user_input}</code>
             </div>
             """, unsafe_allow_html=True)
+
+            # Scroll to result
+            components.html(
+                """
+                <script>
+                    setTimeout(function() {
+                        const element = window.parent.document.getElementById('prediction-result');
+                        if (element) {
+                            element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        }
+                    }, 150);
+                </script>
+                """,
+                height=0
+            )
 
 # Info Section
 st.markdown("<br>", unsafe_allow_html=True)
