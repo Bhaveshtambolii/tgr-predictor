@@ -101,7 +101,7 @@ st.markdown("""
             display: none;
         }
 
-        /* Mobile: show collapse control and auto-collapse sidebar */
+        /* Mobile: show collapse control */
         @media (max-width: 768px) {
             [data-testid="collapsedControl"] {
                 display: block !important;
@@ -109,17 +109,11 @@ st.markdown("""
 
             [data-testid="stSidebar"] {
                 min-width: 0 !important;
-                max-width: 100% !important;
+                max-width: 85% !important;
             }
 
             [data-testid="stSidebar"] > div:first-child {
                 width: 100% !important;
-            }
-
-            [data-testid="stSidebar"][data-collapsed="true"] {
-                width: 0 !important;
-                min-width: 0 !important;
-                transform: translateX(-100%);
             }
         }
 
@@ -523,19 +517,27 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# Auto-collapse sidebar on mobile
+# Auto-collapse sidebar on mobile by clicking the collapse button
 components.html(
     """
     <script>
         (function() {
             const isMobile = window.innerWidth <= 768;
-            const sidebar = window.parent.document.querySelector('[data-testid="stSidebar"]');
+            if (isMobile) {
+                // Wait for Streamlit to fully render
+                setTimeout(function() {
+                    const collapseBtn = window.parent.document.querySelector('[data-testid="collapsedControl"] button');
+                    const sidebar = window.parent.document.querySelector('[data-testid="stSidebar"]');
 
-            if (isMobile && sidebar) {
-                // On mobile: collapse sidebar by setting attribute
-                sidebar.setAttribute('data-collapsed', 'true');
-                sidebar.style.width = '0px';
-                sidebar.style.minWidth = '0px';
+                    // Check if sidebar is currently expanded (has width)
+                    if (sidebar && collapseBtn) {
+                        const sidebarWidth = sidebar.getBoundingClientRect().width;
+                        if (sidebarWidth > 50) {
+                            // Sidebar is open, click to close it
+                            collapseBtn.click();
+                        }
+                    }
+                }, 100);
             }
         })();
     </script>
