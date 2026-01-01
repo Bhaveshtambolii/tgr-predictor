@@ -101,6 +101,28 @@ st.markdown("""
             display: none;
         }
 
+        /* Mobile: show collapse control and auto-collapse sidebar */
+        @media (max-width: 768px) {
+            [data-testid="collapsedControl"] {
+                display: block !important;
+            }
+
+            [data-testid="stSidebar"] {
+                min-width: 0 !important;
+                max-width: 100% !important;
+            }
+
+            [data-testid="stSidebar"] > div:first-child {
+                width: 100% !important;
+            }
+
+            [data-testid="stSidebar"][data-collapsed="true"] {
+                width: 0 !important;
+                min-width: 0 !important;
+                transform: translateX(-100%);
+            }
+        }
+
         [data-testid="stSidebar"] [data-testid="stMarkdownContainer"] {
             color: #e0e0e0;
         }
@@ -500,6 +522,26 @@ st.markdown("""
         }
     </style>
 """, unsafe_allow_html=True)
+
+# Auto-collapse sidebar on mobile
+components.html(
+    """
+    <script>
+        (function() {
+            const isMobile = window.innerWidth <= 768;
+            const sidebar = window.parent.document.querySelector('[data-testid="stSidebar"]');
+
+            if (isMobile && sidebar) {
+                // On mobile: collapse sidebar by setting attribute
+                sidebar.setAttribute('data-collapsed', 'true');
+                sidebar.style.width = '0px';
+                sidebar.style.minWidth = '0px';
+            }
+        })();
+    </script>
+    """,
+    height=0
+)
 
 # --- SIDEBAR CHATBOT ---
 with st.sidebar:
