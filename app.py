@@ -496,6 +496,131 @@ st.markdown("""
         #MainMenu {visibility: hidden;}
         footer {visibility: hidden;}
 
+        /* ============================================================
+           LIQUID DOTS OVERLAY
+           ============================================================
+           Very sparse, randomly distributed liquid dots flowing
+           top-right → bottom-left. Uses prime-number spacing for
+           pseudo-random appearance.
+
+           TWEAKABLE:
+           - Dot count: Increase background-size for fewer dots
+           - Randomness: Adjust prime-based spacing values
+           - Flow speed: Change animation duration
+           ============================================================ */
+
+        /* Main overlay container */
+        .laminar-flow-overlay {
+            position: fixed;
+            inset: 0;
+            z-index: 1;
+            pointer-events: none;
+            overflow: hidden;
+            background: transparent;
+        }
+
+        /* Layer 1: Sparse random dots */
+        .laminar-flow-overlay::before {
+            content: '';
+            position: absolute;
+            top: -100%;
+            left: -100%;
+            width: 300%;
+            height: 300%;
+            background-image:
+                radial-gradient(circle 4px at center, rgba(0, 230, 255, 0.45) 0%, rgba(0, 220, 255, 0.2) 40%, transparent 70%),
+                radial-gradient(circle 14px at center, rgba(0, 210, 245, 0.12) 0%, transparent 75%);
+            background-size: 397px 433px, 397px 433px;
+            background-position: 0 0, 0 0;
+            animation: liquidFlow 50s linear infinite;
+            will-change: transform;
+        }
+
+        /* Layer 2: Different prime spacing - creates randomness */
+        .laminar-flow-overlay::after {
+            content: '';
+            position: absolute;
+            top: -100%;
+            left: -100%;
+            width: 300%;
+            height: 300%;
+            background-image:
+                radial-gradient(circle 3px at center, rgba(0, 220, 255, 0.4) 0%, rgba(0, 210, 250, 0.15) 50%, transparent 75%),
+                radial-gradient(circle 11px at center, rgba(0, 215, 250, 0.1) 0%, transparent 80%);
+            background-size: 509px 547px, 509px 547px;
+            background-position: 173px 211px, 173px 211px;
+            animation: liquidFlow 65s linear infinite;
+            animation-delay: -25s;
+            will-change: transform;
+        }
+
+        /* Liquid flow animation */
+        @keyframes liquidFlow {
+            0% {
+                transform: translateX(33.33%) translateY(-33.33%);
+            }
+            100% {
+                transform: translateX(-33.33%) translateY(33.33%);
+            }
+        }
+
+        /* Layer 3: Very sparse accent */
+        .flow-layer-2 {
+            position: fixed;
+            top: -100%;
+            left: -100%;
+            width: 300%;
+            height: 300%;
+            z-index: 1;
+            pointer-events: none;
+            background-image:
+                radial-gradient(circle 5px at center, rgba(0, 235, 255, 0.35) 0%, rgba(0, 225, 255, 0.12) 50%, transparent 75%),
+                radial-gradient(circle 16px at center, rgba(0, 220, 250, 0.07) 0%, transparent 70%);
+            background-size: 631px 673px, 631px 673px;
+            background-position: 89px 127px, 89px 127px;
+            animation: liquidFlow 80s linear infinite;
+            animation-delay: -40s;
+            will-change: transform;
+        }
+
+        /* Layer 4: Extra sparse large drops */
+        .flow-layer-3 {
+            position: fixed;
+            top: -100%;
+            left: -100%;
+            width: 300%;
+            height: 300%;
+            z-index: 1;
+            pointer-events: none;
+            background-image:
+                radial-gradient(circle 6px at center, rgba(0, 230, 255, 0.3) 0%, rgba(0, 220, 255, 0.1) 45%, transparent 70%),
+                radial-gradient(circle 20px at center, rgba(0, 215, 250, 0.05) 0%, transparent 65%);
+            background-size: 743px 787px, 743px 787px;
+            background-position: 317px 53px, 317px 53px;
+            animation: liquidFlow 95s linear infinite;
+            animation-delay: -15s;
+            will-change: transform;
+        }
+
+        /* Subtle ambient glow */
+        .laminar-glow {
+            position: fixed;
+            inset: 0;
+            z-index: 0;
+            pointer-events: none;
+            background:
+                radial-gradient(
+                    ellipse 45% 22% at 72% 28%,
+                    rgba(0, 200, 230, 0.01) 0%,
+                    transparent 60%
+                ),
+                radial-gradient(
+                    ellipse 35% 18% at 22% 72%,
+                    rgba(0, 210, 235, 0.008) 0%,
+                    transparent 55%
+                );
+        }
+
         /* Scrollbar styling */
         ::-webkit-scrollbar {
             width: 8px;
@@ -517,11 +642,48 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# Auto-collapse sidebar on mobile by clicking the collapse button
+# Auto-collapse sidebar on mobile
 components.html(
     """
     <script>
         (function() {
+            // ============================================================
+            // MICROFLUIDIC CHANNEL FLOW - Inject overlay layers
+            // ============================================================
+
+            // Layer 1: Ambient glow (static)
+            if (!window.parent.document.getElementById('laminarGlow')) {
+                const glow = document.createElement('div');
+                glow.id = 'laminarGlow';
+                glow.className = 'laminar-glow';
+                window.parent.document.body.insertBefore(glow, window.parent.document.body.firstChild);
+            }
+
+            // Layer 2: Main flow overlay (channels + primary flow)
+            if (!window.parent.document.getElementById('laminarFlowOverlay')) {
+                const overlay = document.createElement('div');
+                overlay.id = 'laminarFlowOverlay';
+                overlay.className = 'laminar-flow-overlay';
+                window.parent.document.body.insertBefore(overlay, window.parent.document.body.firstChild.nextSibling);
+            }
+
+            // Layer 3: Secondary flow channel (depth layer)
+            if (!window.parent.document.getElementById('flowLayer2')) {
+                const flow2 = document.createElement('div');
+                flow2.id = 'flowLayer2';
+                flow2.className = 'flow-layer-2';
+                window.parent.document.body.insertBefore(flow2, window.parent.document.body.firstChild.nextSibling);
+            }
+
+            // Layer 4: Tertiary flow channel (more depth)
+            if (!window.parent.document.getElementById('flowLayer3')) {
+                const flow3 = document.createElement('div');
+                flow3.id = 'flowLayer3';
+                flow3.className = 'flow-layer-3';
+                window.parent.document.body.insertBefore(flow3, window.parent.document.body.firstChild.nextSibling);
+            }
+
+            // Mobile sidebar auto-collapse
             const isMobile = window.innerWidth <= 768;
             if (isMobile) {
                 // Wait for Streamlit to fully render
