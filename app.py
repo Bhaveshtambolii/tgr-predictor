@@ -2,15 +2,26 @@ import streamlit as st
 import streamlit.components.v1 as components
 import joblib
 import numpy as np
+import requests
 from rdkit import Chem
 from rdkit.Chem import AllChem
 from langchain_groq import ChatGroq
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
 
+# Optional: PubChem autocomplete
+try:
+    import pubchempy as pcp
+    PUBCHEM_AVAILABLE = True
+except ImportError:
+    PUBCHEM_AVAILABLE = False
+
 import os
 from dotenv import load_dotenv
 load_dotenv()
+
+# --- PAGE CONFIG (must be first Streamlit command) ---
+st.set_page_config(page_title="TGR Activity AI", page_icon="🧪", layout="wide", initial_sidebar_state="expanded")
 
 ## Langsmith Tracking
 lc_api_key = os.getenv("LC_API_KEY")
@@ -62,10 +73,6 @@ def generate_response(question, api_key):
     except Exception as e:
         return f"❌ Error: {str(e)}. Please check your API key in settings."
 
-
-# --- PAGE CONFIG ---
-st.set_page_config(page_title="TGR Activity AI", page_icon="🧪", layout="wide", initial_sidebar_state="expanded")
-
 # --- CUSTOM CSS ---
 st.markdown("""
     <style>
@@ -83,6 +90,28 @@ st.markdown("""
 
         [data-testid="stHeader"] {
             background: rgba(0,0,0,0);
+        }
+
+        /* Remove vertical centering - align content to top */
+        [data-testid="stAppViewContainer"] > .main {
+            min-height: auto !important;
+        }
+
+        .main .block-container {
+            padding-top: 1rem !important;
+            min-height: auto !important;
+            display: flex;
+            flex-direction: column;
+            align-items: stretch;
+        }
+
+        [data-testid="stVerticalBlock"] {
+            gap: 0.5rem;
+        }
+
+        /* Remove extra spacing from main area */
+        .stApp > header + div {
+            min-height: auto !important;
         }
 
         /* Sidebar styling */
@@ -484,6 +513,23 @@ st.markdown("""
             border-radius: 10px;
         }
 
+        /* Suggestion buttons styling */
+        div[data-testid="stHorizontalBlock"] button[kind="secondary"] {
+            background: rgba(0, 224, 255, 0.08) !important;
+            border: 1px solid rgba(0, 224, 255, 0.25) !important;
+            color: #00e0ff !important;
+            font-size: 0.85rem !important;
+            padding: 0.4rem 0.8rem !important;
+            border-radius: 8px !important;
+            transition: all 0.2s ease !important;
+        }
+
+        div[data-testid="stHorizontalBlock"] button[kind="secondary"]:hover {
+            background: rgba(0, 224, 255, 0.15) !important;
+            border-color: rgba(0, 224, 255, 0.4) !important;
+            transform: translateY(-1px);
+        }
+
         /* Divider */
         hr {
             border: none;
@@ -639,6 +685,77 @@ st.markdown("""
         ::-webkit-scrollbar-thumb:hover {
             background: rgba(0, 224, 255, 0.5);
         }
+
+        /* ============================================================
+           MAGIC LINE NAVIGATION - Top bar, no outer container
+           ============================================================ */
+        .magic-line-nav {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 0.75rem 2rem;
+            margin: 0;
+            width: 100%;
+            position: relative;
+            background: transparent;
+        }
+
+        .magic-line-nav-inner {
+            display: flex;
+            justify-content: center;
+            gap: 0.5rem;
+            position: relative;
+        }
+
+        .magic-line-nav a {
+            position: relative;
+            padding: 0.75rem 1.5rem;
+            color: rgba(255, 255, 255, 0.6);
+            text-decoration: none;
+            font-size: 1rem;
+            font-weight: 500;
+            letter-spacing: 0.02em;
+            transition: color 0.3s ease;
+            z-index: 2;
+            cursor: pointer;
+            border-radius: 8px;
+        }
+
+        .magic-line-nav a:hover {
+            color: rgba(255, 255, 255, 0.9);
+        }
+
+        .magic-line-nav a.active {
+            color: #ffffff;
+        }
+
+        /* Hide the line - only keep pill */
+        .magic-line {
+            display: none;
+        }
+
+        .magic-line-pill {
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+            height: calc(100% - 4px);
+            background: linear-gradient(135deg, rgba(0, 224, 255, 0.12), rgba(0, 119, 255, 0.08));
+            border: 1px solid rgba(0, 224, 255, 0.3);
+            border-radius: 10px;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            z-index: 1;
+        }
+
+        /* Mobile responsive */
+        @media (max-width: 768px) {
+            .magic-line-nav {
+                padding: 0.5rem 1rem;
+            }
+            .magic-line-nav a {
+                padding: 0.5rem 1rem;
+                font-size: 0.9rem;
+            }
+        }
     </style>
 """, unsafe_allow_html=True)
 
@@ -707,6 +824,36 @@ components.html(
     height=0
 )
 
+# --- PAGE STATE MANAGEMENT ---
+if "current_page" not in st.session_state:
+    st.session_state.current_page = "predictor"
+
+# Define pages
+PAGES = {
+    "predictor": {"title": "🔬 Predictor", "icon": "🔬"},
+    "analysis": {"title": "📊 Analysis", "icon": "📊"},
+    "about": {"title": "ℹ️ About", "icon": "ℹ️"},
+}
+
+def set_page(page_name):
+    st.session_state.current_page = page_name
+
+# Navigation will be rendered after hero header below
+
+# Hide the Streamlit nav buttons CSS
+st.markdown("""
+<style>
+    /* Hide the navigation buttons */
+    div[data-testid="stHorizontalBlock"]:has(button[kind="secondary"]) {
+        position: absolute;
+        opacity: 0;
+        pointer-events: none;
+        height: 0;
+        overflow: hidden;
+    }
+</style>
+""", unsafe_allow_html=True)
+
 # --- SIDEBAR CHATBOT ---
 with st.sidebar:
     st.markdown("""
@@ -721,20 +868,18 @@ with st.sidebar:
     if "messages" not in st.session_state:
         st.session_state.messages = []
     if "groq_api_key" not in st.session_state:
-        st.session_state.groq_api_key = None  # No default API key
+        st.session_state.groq_api_key = None
 
     # API Key Configuration Section
     with st.expander("🔑 API Key Settings", expanded=not st.session_state.groq_api_key):
         st.markdown("**Groq API Key Configuration**")
         st.caption("The chatbot requires your Groq API key to function.")
 
-        # Show current status
         if st.session_state.groq_api_key:
             st.success("✓ API Key configured - Chatbot is ready!")
         else:
             st.warning("⚠ No API Key set - Chatbot is disabled")
 
-        # API Key input
         api_key_input = st.text_input(
             "Enter your Groq API Key:",
             value="",
@@ -756,11 +901,10 @@ with st.sidebar:
         with col2:
             if st.button("🗑️ Clear Key", use_container_width=True):
                 st.session_state.groq_api_key = None
-                st.session_state.messages = []  # Clear chat history too
+                st.session_state.messages = []
                 st.success("API Key cleared")
                 st.rerun()
 
-    # Information section at top
     with st.expander("ℹ️ About Assistant"):
         st.info("""
         **I can help you with:**
@@ -777,30 +921,21 @@ with st.sidebar:
 
     st.markdown("---")
 
-    # Check if API key is configured
     if not st.session_state.groq_api_key:
         st.info("💡 **Chatbot is disabled**\n\nPlease add your Groq API key in the settings above to start chatting.")
     else:
-        # Display chat history with scrollable container
         chat_container = st.container(height=400)
         with chat_container:
             for message in st.session_state.messages:
                 with st.chat_message(message["role"]):
                     st.markdown(message["content"])
 
-        # Chat input at bottom (only shown when API key is set)
         question = st.chat_input("Ask me anything...")
 
-        # Process new message
         if question:
-            # Add user message to chat history
             st.session_state.messages.append({"role": "user", "content": question})
-
-            # Generate and display assistant response
             with st.spinner("Thinking..."):
                 response = generate_response(question, st.session_state.groq_api_key)
-
-            # Add assistant response to chat history
             st.session_state.messages.append({"role": "assistant", "content": response})
             st.rerun()
 
@@ -813,9 +948,11 @@ with st.sidebar:
 
 # --- MAIN UI ---
 
-# Header Section
+# =====================================================================
+# HERO HEADER (Common for all pages)
+# =====================================================================
 st.markdown("""
-<div class="glass-card" style="text-align: center; padding: 1.5rem 1rem; margin: 0.5rem auto 1.5rem auto; max-width: 700px;">
+<div class="glass-card" style="text-align: center; padding: 1.5rem 1rem; margin: 0.5rem auto 1rem auto; max-width: 700px;">
     <div class="main-title" style="font-size: 2.5rem; margin-bottom: 0.3rem;">🧪 TGR Activity Predictor</div>
     <div class="main-subtitle" style="font-size: 1rem; margin-bottom: 0;">
         Predict compound activity against <strong>Thioredoxin Glutathione Reductase (TGR)</strong><br>
@@ -824,184 +961,485 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-# Main Prediction Card
+# =====================================================================
+# NAVIGATION TABS (Between hero and content)
+# =====================================================================
+current_page = st.session_state.current_page
 
-
-col1, col2, col3 = st.columns([1, 3, 1])
-with col2:
-    st.markdown('<div class="section-header">🔬 Molecular Prediction</div>', unsafe_allow_html=True)
-
-    user_input = st.text_input(
-        "Enter SMILES Notation",
-        placeholder="e.g., CC(=O)Oc1ccccc1C(=O)O",
-        help="SMILES (Simplified Molecular Input Line Entry System) is a notation for describing molecular structures"
-    )
-
-    # Example SMILES section
-    st.markdown("""
-    <div style="margin: 1rem 0;">
-        <span style="color: rgba(255,255,255,0.5); font-size: 0.85rem;">Try examples:</span>
-        <span class="smiles-pill">c1ccccc1</span>
-        <span class="smiles-pill">CCO</span>
-        <span class="smiles-pill">CC(=O)O</span>
-        <span class="smiles-pill">CC(=O)Nc1ccc(O)cc1</span>
+# Create navigation with magic line effect
+nav_html = f"""
+<div class="magic-line-nav" id="magicLineNav">
+    <div class="magic-line-nav-inner">
+        <a data-page="predictor" class="{'active' if current_page == 'predictor' else ''}" onclick="setPage('predictor')">🔬 Predictor</a>
+        <a data-page="analysis" class="{'active' if current_page == 'analysis' else ''}" onclick="setPage('analysis')">📊 Analysis</a>
+        <a data-page="about" class="{'active' if current_page == 'about' else ''}" onclick="setPage('about')">ℹ️ About</a>
+        <div class="magic-line-pill" id="magicLinePill"></div>
+        <div class="magic-line" id="magicLine"></div>
     </div>
-    """, unsafe_allow_html=True)
+</div>
+"""
+st.markdown(nav_html, unsafe_allow_html=True)
 
-    predict_col1, predict_col2, predict_col3 = st.columns([1, 2, 1])
-    with predict_col2:
-        predict_button = st.button("🔍 PREDICT ACTIVITY", use_container_width=True)
+# Magic line JavaScript
+components.html(f"""
+<script>
+(function() {{
+    const currentPage = '{current_page}';
 
-st.markdown('</div>', unsafe_allow_html=True)
+    function initMagicLine() {{
+        const nav = window.parent.document.getElementById('magicLineNav');
+        if (!nav) {{
+            setTimeout(initMagicLine, 100);
+            return;
+        }}
 
-# Prediction Result
-if predict_button:
-    if not user_input.strip():
-        st.warning("Please enter a SMILES notation to make a prediction.")
-    else:
-        fp = smiles_to_fp(user_input)
-        if fp is None:
-            st.error("❌ Invalid SMILES notation. Please check your input and try again.")
-        else:
-            prediction = model.predict(fp)[0]
+        const links = nav.querySelectorAll('a[data-page]');
+        const magicLine = nav.querySelector('#magicLine');
+        const magicPill = nav.querySelector('#magicLinePill');
+        const navInner = nav.querySelector('.magic-line-nav-inner');
 
-            st.markdown("<br>", unsafe_allow_html=True)
+        if (!links.length || !magicLine || !magicPill) return;
 
-            result_col1, result_col2, result_col3 = st.columns([1, 2, 1])
-            with result_col2:
-                if prediction == 1:
-                    st.markdown("""
-                    <div id="prediction-result" class="chemical-fill-container" style="border-color: rgba(34, 197, 94, 0.5);">
-                        <div class="chemical-fill chemical-fill-active"></div>
-                        <div class="bubbles">
-                            <div class="bubble" style="left: 5%; width: 6px; height: 6px; animation-delay: 0s; animation-duration: 2.5s;"></div>
-                            <div class="bubble" style="left: 12%; width: 8px; height: 8px; animation-delay: 0.4s; animation-duration: 2.2s;"></div>
-                            <div class="bubble" style="left: 22%; width: 5px; height: 5px; animation-delay: 1.2s; animation-duration: 2.8s;"></div>
-                            <div class="bubble" style="left: 30%; width: 10px; height: 10px; animation-delay: 0.8s; animation-duration: 2s;"></div>
-                            <div class="bubble" style="left: 40%; width: 7px; height: 7px; animation-delay: 1.5s; animation-duration: 2.3s;"></div>
-                            <div class="bubble" style="left: 50%; width: 6px; height: 6px; animation-delay: 0.2s; animation-duration: 2.6s;"></div>
-                            <div class="bubble" style="left: 58%; width: 9px; height: 9px; animation-delay: 1s; animation-duration: 2.1s;"></div>
-                            <div class="bubble" style="left: 68%; width: 5px; height: 5px; animation-delay: 0.6s; animation-duration: 2.7s;"></div>
-                            <div class="bubble" style="left: 78%; width: 8px; height: 8px; animation-delay: 1.3s; animation-duration: 2.4s;"></div>
-                            <div class="bubble" style="left: 88%; width: 6px; height: 6px; animation-delay: 0.3s; animation-duration: 2.2s;"></div>
-                        </div>
-                        <div class="result-content">
-                            <div class="result-title" style="color: #22c55e; font-size: 1.8rem;">✅ ACTIVE</div>
-                            <div class="result-subtitle">This compound shows predicted activity against TGR</div>
-                        </div>
-                    </div>
-                    """, unsafe_allow_html=True)
-                else:
-                    st.markdown("""
-                    <div id="prediction-result" class="chemical-fill-container" style="border-color: rgba(239, 68, 68, 0.5);">
-                        <div class="chemical-fill chemical-fill-inactive"></div>
-                        <div class="bubbles">
-                            <div class="bubble" style="left: 8%; width: 7px; height: 7px; animation-delay: 0.5s; animation-duration: 2.3s;"></div>
-                            <div class="bubble" style="left: 18%; width: 5px; height: 5px; animation-delay: 1.1s; animation-duration: 2.6s;"></div>
-                            <div class="bubble" style="left: 25%; width: 9px; height: 9px; animation-delay: 0.2s; animation-duration: 2.1s;"></div>
-                            <div class="bubble" style="left: 35%; width: 6px; height: 6px; animation-delay: 0.9s; animation-duration: 2.5s;"></div>
-                            <div class="bubble" style="left: 45%; width: 8px; height: 8px; animation-delay: 1.4s; animation-duration: 2.2s;"></div>
-                            <div class="bubble" style="left: 55%; width: 5px; height: 5px; animation-delay: 0.3s; animation-duration: 2.7s;"></div>
-                            <div class="bubble" style="left: 65%; width: 7px; height: 7px; animation-delay: 0.7s; animation-duration: 2.4s;"></div>
-                            <div class="bubble" style="left: 72%; width: 10px; height: 10px; animation-delay: 1.2s; animation-duration: 2s;"></div>
-                            <div class="bubble" style="left: 82%; width: 6px; height: 6px; animation-delay: 0.1s; animation-duration: 2.8s;"></div>
-                            <div class="bubble" style="left: 92%; width: 8px; height: 8px; animation-delay: 0.8s; animation-duration: 2.3s;"></div>
-                        </div>
-                        <div class="result-content">
-                            <div class="result-title" style="color: #ef4444; font-size: 1.8rem;">❌ INACTIVE</div>
-                            <div class="result-subtitle">This compound shows no predicted activity against TGR</div>
-                        </div>
-                    </div>
-                    """, unsafe_allow_html=True)
+        function updateMagicLine(el) {{
+            const rect = el.getBoundingClientRect();
+            const navRect = navInner.getBoundingClientRect();
+            const left = rect.left - navRect.left;
+            const width = rect.width;
 
-            # Display analyzed compound
-            st.markdown("<br>", unsafe_allow_html=True)
-            st.markdown(f"""
-            <div class="glass-card" style="text-align: center;">
-                <span style="color: rgba(255,255,255,0.5);">Analyzed Compound:</span>
-                <code style="display: block; margin-top: 0.5rem; font-size: 1.1rem; color: #00e0ff; font-family: 'JetBrains Mono', monospace;">{user_input}</code>
-            </div>
-            """, unsafe_allow_html=True)
+            magicLine.style.left = left + 'px';
+            magicLine.style.width = width + 'px';
 
-            # Scroll to result
-            components.html(
-                """
-                <script>
-                    setTimeout(function() {
-                        const element = window.parent.document.getElementById('prediction-result');
-                        if (element) {
-                            element.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                        }
-                    }, 150);
-                </script>
-                """,
-                height=0
+            magicPill.style.left = left + 'px';
+            magicPill.style.width = width + 'px';
+        }}
+
+        // Set initial position
+        const activeLink = nav.querySelector('a.active') || links[0];
+        updateMagicLine(activeLink);
+
+        // Add hover effects
+        links.forEach(link => {{
+            link.addEventListener('mouseenter', () => updateMagicLine(link));
+            link.addEventListener('mouseleave', () => {{
+                const active = nav.querySelector('a.active') || links[0];
+                updateMagicLine(active);
+            }});
+        }});
+
+        // Update on window resize
+        window.addEventListener('resize', () => {{
+            const active = nav.querySelector('a.active') || links[0];
+            updateMagicLine(active);
+        }});
+    }}
+
+    // Initialize after DOM is ready
+    setTimeout(initMagicLine, 100);
+}})();
+
+// Handle nav clicks
+function setPage(page) {{
+    const buttons = window.parent.document.querySelectorAll('button[kind="secondary"]');
+    buttons.forEach(btn => {{
+        if (btn.innerText.toLowerCase().includes(page)) {{
+            btn.click();
+        }}
+    }});
+}}
+window.parent.setPage = setPage;
+
+setTimeout(() => {{
+    const nav = window.parent.document.getElementById('magicLineNav');
+    if (nav) {{
+        const links = nav.querySelectorAll('a[data-page]');
+        links.forEach(link => {{
+            link.onclick = (e) => {{
+                e.preventDefault();
+                const page = link.getAttribute('data-page');
+                setPage(page);
+            }};
+        }});
+    }}
+}}, 200);
+</script>
+""", height=0)
+
+# Navigation buttons (invisible but functional)
+nav_cols = st.columns(3)
+with nav_cols[0]:
+    if st.button("Predictor", key="nav_predictor", use_container_width=True, type="secondary"):
+        set_page("predictor")
+        st.rerun()
+with nav_cols[1]:
+    if st.button("Analysis", key="nav_analysis", use_container_width=True, type="secondary"):
+        set_page("analysis")
+        st.rerun()
+with nav_cols[2]:
+    if st.button("About", key="nav_about", use_container_width=True, type="secondary"):
+        set_page("about")
+        st.rerun()
+
+# =====================================================================
+# PAGE: PREDICTOR
+# =====================================================================
+if st.session_state.current_page == "predictor":
+    # Initialize session state
+    if "selected_smiles" not in st.session_state:
+        st.session_state.selected_smiles = ""
+    if "pubchem_suggestions" not in st.session_state:
+        st.session_state.pubchem_suggestions = []
+
+    # Centered container for Molecular Prediction UI
+    _, pred_container, _ = st.columns([1, 2, 1])
+    with pred_container:
+        # Main Prediction Card
+        st.markdown('<div class="section-header" style="text-align: center;">🔬 Molecular Prediction</div>', unsafe_allow_html=True)
+
+        # ========== SMILES INPUT (Main - Outside) ==========
+        user_input = st.text_input(
+            "Enter SMILES Notation",
+            value=st.session_state.selected_smiles,
+            placeholder="e.g., CC(=O)Oc1ccccc1C(=O)O",
+            help="SMILES (Simplified Molecular Input Line Entry System) is a notation for describing molecular structures"
+        )
+
+        # Example SMILES section
+        st.markdown("""
+        <div style="margin: 1rem 0; text-align: center;">
+            <span style="color: rgba(255,255,255,0.5); font-size: 0.85rem;">Try examples:</span>
+            <span class="smiles-pill">c1ccccc1</span>
+            <span class="smiles-pill">CCO</span>
+            <span class="smiles-pill">CC(=O)O</span>
+            <span class="smiles-pill">CC(=O)Nc1ccc(O)cc1</span>
+        </div>
+        """, unsafe_allow_html=True)
+
+        # ========== COMPOUND NAME SEARCH (Inside Expander) ==========
+        with st.expander("🔎 Search by Compound Name (PubChem)", expanded=False):
+            # Compound name input
+            query = st.text_input(
+                "Enter Compound Name",
+                placeholder="aspirin, caffeine, ibuprofen...",
+                key="compound_query"
             )
 
-# Info Section
-st.markdown("<br>", unsafe_allow_html=True)
+            # Search button
+            search_btn = st.button("🔍 Search PubChem", key="search_pubchem_btn")
 
-info_col1, info_col2, info_col3 = st.columns(3)
+            # Show suggestions when search is clicked or query has 2+ chars
+            if search_btn and query:
+                try:
+                    url = f"https://pubchem.ncbi.nlm.nih.gov/rest/autocomplete/compound/{query}/json?limit=8"
+                    resp = requests.get(url, timeout=3)
+                    if resp.status_code == 200:
+                        suggestions = resp.json().get("dictionary_terms", {}).get("compound", [])[:8]
+                        if suggestions:
+                            st.session_state.pubchem_suggestions = suggestions
+                        else:
+                            st.warning("No compounds found. Try different spelling.")
+                except Exception as e:
+                    st.error(f"Search failed: {e}")
 
-with info_col1:
-    st.markdown("""
-    <div class="glass-card">
-        <div class="section-header">🎯 About TGR</div>
-        <div class="info-card">
-            <div class="info-card-title">What is TGR?</div>
-            <div class="info-card-text">
-                Thioredoxin Glutathione Reductase is a key enzyme in parasitic organisms,
-                making it an important drug target for treating parasitic diseases.
+            # Show dropdown if suggestions exist
+            if "pubchem_suggestions" in st.session_state and st.session_state.pubchem_suggestions:
+                selected = st.selectbox(
+                    "💡 Select compound:",
+                    options=st.session_state.pubchem_suggestions
+                )
+
+                if st.button("🔄 Get SMILES", type="primary"):
+                    if PUBCHEM_AVAILABLE:
+                        try:
+                            compounds = pcp.get_compounds(selected, 'name')
+                            if compounds:
+                                st.session_state.selected_smiles = compounds[0].isomeric_smiles
+                                st.session_state.pubchem_suggestions = []  # Clear suggestions
+                                st.success(f"✅ {selected} → `{st.session_state.selected_smiles}`")
+                                st.rerun()
+                        except Exception as e:
+                            st.error(f"Error: {e}")
+                    else:
+                        st.warning("Install: pip install pubchempy")
+
+        # Predict button - Centered
+        st.markdown("<br>", unsafe_allow_html=True)
+        predict_button = st.button("🔍 PREDICT ACTIVITY", use_container_width=True, type="primary")
+
+    # Prediction Result
+    if predict_button:
+        if not user_input or not user_input.strip():
+            st.warning("Please enter a SMILES notation to make a prediction.")
+        else:
+            fp = smiles_to_fp(user_input)
+            if fp is None:
+                st.error("❌ Invalid SMILES notation. Please check your input and try again.")
+            else:
+                prediction = model.predict(fp)[0]
+
+                st.markdown("<br>", unsafe_allow_html=True)
+
+                result_col1, result_col2, result_col3 = st.columns([1, 2, 1])
+                with result_col2:
+                    if prediction == 1:
+                        st.markdown("""
+                        <div id="prediction-result" class="chemical-fill-container" style="border-color: rgba(34, 197, 94, 0.5);">
+                            <div class="chemical-fill chemical-fill-active"></div>
+                            <div class="bubbles">
+                                <div class="bubble" style="left: 5%; width: 6px; height: 6px; animation-delay: 0s; animation-duration: 2.5s;"></div>
+                                <div class="bubble" style="left: 12%; width: 8px; height: 8px; animation-delay: 0.4s; animation-duration: 2.2s;"></div>
+                                <div class="bubble" style="left: 22%; width: 5px; height: 5px; animation-delay: 1.2s; animation-duration: 2.8s;"></div>
+                                <div class="bubble" style="left: 30%; width: 10px; height: 10px; animation-delay: 0.8s; animation-duration: 2s;"></div>
+                                <div class="bubble" style="left: 40%; width: 7px; height: 7px; animation-delay: 1.5s; animation-duration: 2.3s;"></div>
+                                <div class="bubble" style="left: 50%; width: 6px; height: 6px; animation-delay: 0.2s; animation-duration: 2.6s;"></div>
+                                <div class="bubble" style="left: 58%; width: 9px; height: 9px; animation-delay: 1s; animation-duration: 2.1s;"></div>
+                                <div class="bubble" style="left: 68%; width: 5px; height: 5px; animation-delay: 0.6s; animation-duration: 2.7s;"></div>
+                                <div class="bubble" style="left: 78%; width: 8px; height: 8px; animation-delay: 1.3s; animation-duration: 2.4s;"></div>
+                                <div class="bubble" style="left: 88%; width: 6px; height: 6px; animation-delay: 0.3s; animation-duration: 2.2s;"></div>
+                            </div>
+                            <div class="result-content">
+                                <div class="result-title" style="color: #22c55e; font-size: 1.8rem;">✅ ACTIVE</div>
+                                <div class="result-subtitle">This compound shows predicted activity against TGR</div>
+                            </div>
+                        </div>
+                        """, unsafe_allow_html=True)
+                    else:
+                        st.markdown("""
+                        <div id="prediction-result" class="chemical-fill-container" style="border-color: rgba(239, 68, 68, 0.5);">
+                            <div class="chemical-fill chemical-fill-inactive"></div>
+                            <div class="bubbles">
+                                <div class="bubble" style="left: 8%; width: 7px; height: 7px; animation-delay: 0.5s; animation-duration: 2.3s;"></div>
+                                <div class="bubble" style="left: 18%; width: 5px; height: 5px; animation-delay: 1.1s; animation-duration: 2.6s;"></div>
+                                <div class="bubble" style="left: 25%; width: 9px; height: 9px; animation-delay: 0.2s; animation-duration: 2.1s;"></div>
+                                <div class="bubble" style="left: 35%; width: 6px; height: 6px; animation-delay: 0.9s; animation-duration: 2.5s;"></div>
+                                <div class="bubble" style="left: 45%; width: 8px; height: 8px; animation-delay: 1.4s; animation-duration: 2.2s;"></div>
+                                <div class="bubble" style="left: 55%; width: 5px; height: 5px; animation-delay: 0.3s; animation-duration: 2.7s;"></div>
+                                <div class="bubble" style="left: 65%; width: 7px; height: 7px; animation-delay: 0.7s; animation-duration: 2.4s;"></div>
+                                <div class="bubble" style="left: 72%; width: 10px; height: 10px; animation-delay: 1.2s; animation-duration: 2s;"></div>
+                                <div class="bubble" style="left: 82%; width: 6px; height: 6px; animation-delay: 0.1s; animation-duration: 2.8s;"></div>
+                                <div class="bubble" style="left: 92%; width: 8px; height: 8px; animation-delay: 0.8s; animation-duration: 2.3s;"></div>
+                            </div>
+                            <div class="result-content">
+                                <div class="result-title" style="color: #ef4444; font-size: 1.8rem;">❌ INACTIVE</div>
+                                <div class="result-subtitle">This compound shows no predicted activity against TGR</div>
+                            </div>
+                        </div>
+                        """, unsafe_allow_html=True)
+
+                # Display analyzed compound
+                st.markdown("<br>", unsafe_allow_html=True)
+                st.markdown(f"""
+                <div class="glass-card" style="text-align: center;">
+                    <span style="color: rgba(255,255,255,0.5);">Analyzed Compound:</span>
+                    <code style="display: block; margin-top: 0.5rem; font-size: 1.1rem; color: #00e0ff; font-family: 'JetBrains Mono', monospace;">{user_input}</code>
+                </div>
+                """, unsafe_allow_html=True)
+
+                # Scroll to result
+                components.html(
+                    """
+                    <script>
+                        setTimeout(function() {
+                            const element = window.parent.document.getElementById('prediction-result');
+                            if (element) {
+                                element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                            }
+                        }, 150);
+                    </script>
+                    """,
+                    height=0
+                )
+
+    # Info Section
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    info_col1, info_col2, info_col3 = st.columns(3)
+
+    with info_col1:
+        st.markdown("""
+        <div class="glass-card">
+            <div class="section-header">🎯 About TGR</div>
+            <div class="info-card">
+                <div class="info-card-title">What is TGR?</div>
+                <div class="info-card-text">
+                    Thioredoxin Glutathione Reductase is a key enzyme in parasitic organisms,
+                    making it an important drug target for treating parasitic diseases.
+                </div>
+            </div>
+            <div class="info-card">
+                <div class="info-card-title">Why Target TGR?</div>
+                <div class="info-card-text">
+                    TGR is essential for parasite survival but absent in humans,
+                    making it an ideal selective drug target.
+                </div>
             </div>
         </div>
-        <div class="info-card">
-            <div class="info-card-title">Why Target TGR?</div>
-            <div class="info-card-text">
-                TGR is essential for parasite survival but absent in humans,
-                making it an ideal selective drug target.
+        """, unsafe_allow_html=True)
+
+    with info_col2:
+        st.markdown("""
+        <div class="glass-card">
+            <div class="section-header">📖 How to Use</div>
+            <div class="info-card">
+                <div class="info-card-title">Step 1: Get SMILES</div>
+                <div class="info-card-text">
+                    Obtain the SMILES notation of your compound from databases like PubChem,
+                    ChEMBL, or use the AI assistant.
+                </div>
             </div>
+            <div class="info-card">
+                <div class="info-card-title">Step 2: Predict</div>
+                <div class="info-card-text">
+                    Enter the SMILES string and click Predict to get instant
+                    activity prediction results.
+                </div>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+    with info_col3:
+        st.markdown("""
+        <div class="glass-card">
+            <div class="section-header">⚙️ Model Info</div>
+            <div class="info-card">
+                <div class="info-card-title">Algorithm</div>
+                <div class="info-card-text">
+                    Random Forest classifier trained on curated TGR bioactivity data
+                    with Morgan fingerprints (2048 bits).
+                </div>
+            </div>
+            <div class="info-card">
+                <div class="info-card-title">Features</div>
+                <div class="info-card-text">
+                    Uses circular fingerprints with radius 2 to capture
+                    molecular substructure patterns.
+                </div>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+# =====================================================================
+# PAGE: ANALYSIS
+# =====================================================================
+elif st.session_state.current_page == "analysis":
+    st.markdown("""
+    <div class="glass-card" style="text-align: center; padding: 1.5rem 1rem; margin: 0.5rem auto 1.5rem auto; max-width: 700px;">
+        <div class="main-title" style="font-size: 2.5rem; margin-bottom: 0.3rem;">📊 Analysis</div>
+        <div class="main-subtitle" style="font-size: 1rem; margin-bottom: 0;">
+            Batch analysis and detailed compound insights
         </div>
     </div>
     """, unsafe_allow_html=True)
 
-with info_col2:
     st.markdown("""
     <div class="glass-card">
-        <div class="section-header">📖 How to Use</div>
-        <div class="info-card">
-            <div class="info-card-title">Step 1: Get SMILES</div>
-            <div class="info-card-text">
-                Obtain the SMILES notation of your compound from databases like PubChem,
-                ChEMBL, or use the AI assistant.
-            </div>
-        </div>
-        <div class="info-card">
-            <div class="info-card-title">Step 2: Predict</div>
-            <div class="info-card-text">
-                Enter the SMILES string and click Predict to get instant
-                activity prediction results.
-            </div>
+        <div class="section-header">📈 Batch Prediction</div>
+        <p style="color: rgba(255,255,255,0.7);">
+            Upload a CSV file with SMILES notations to predict activity for multiple compounds at once.
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
+
+    uploaded_file = st.file_uploader("Upload CSV with SMILES column", type=['csv'])
+
+    if uploaded_file is not None:
+        import pandas as pd
+        df = pd.read_csv(uploaded_file)
+        st.write("Preview of uploaded data:")
+        st.dataframe(df.head())
+
+        smiles_col = st.selectbox("Select SMILES column:", df.columns.tolist())
+
+        if st.button("🔬 Run Batch Prediction"):
+            with st.spinner("Processing compounds..."):
+                results = []
+                for smiles in df[smiles_col]:
+                    fp = smiles_to_fp(smiles)
+                    if fp is not None:
+                        pred = model.predict(fp)[0]
+                        results.append("Active" if pred == 1 else "Inactive")
+                    else:
+                        results.append("Invalid SMILES")
+
+                df['Prediction'] = results
+                st.success("Batch prediction complete!")
+                st.dataframe(df)
+
+                # Download button
+                csv = df.to_csv(index=False)
+                st.download_button(
+                    "📥 Download Results",
+                    csv,
+                    "tgr_predictions.csv",
+                    "text/csv"
+                )
+
+# =====================================================================
+# PAGE: ABOUT
+# =====================================================================
+elif st.session_state.current_page == "about":
+    st.markdown("""
+    <div class="glass-card" style="text-align: center; padding: 1.5rem 1rem; margin: 0.5rem auto 1.5rem auto; max-width: 700px;">
+        <div class="main-title" style="font-size: 2.5rem; margin-bottom: 0.3rem;">ℹ️ About</div>
+        <div class="main-subtitle" style="font-size: 1rem; margin-bottom: 0;">
+            Learn more about the TGR Activity Predictor
         </div>
     </div>
     """, unsafe_allow_html=True)
 
-with info_col3:
-    st.markdown("""
-    <div class="glass-card">
-        <div class="section-header">⚙️ Model Info</div>
-        <div class="info-card">
-            <div class="info-card-title">Algorithm</div>
-            <div class="info-card-text">
-                Random Forest classifier trained on curated TGR bioactivity data
-                with Morgan fingerprints (2048 bits).
+    col1, col2 = st.columns(2)
+
+    with col1:
+        st.markdown("""
+        <div class="glass-card">
+            <div class="section-header">🧬 What is TGR?</div>
+            <div class="info-card-text" style="color: rgba(255,255,255,0.8); line-height: 1.8;">
+                <p><strong style="color: #00e0ff;">Thioredoxin Glutathione Reductase (TGR)</strong> is a unique selenoenzyme
+                found in parasitic flatworms such as <em>Schistosoma mansoni</em> and <em>Echinococcus granulosus</em>.</p>
+
+                <p>TGR plays a crucial role in:</p>
+                <ul>
+                    <li>Redox homeostasis in parasites</li>
+                    <li>Defense against oxidative stress</li>
+                    <li>Parasite survival and reproduction</li>
+                </ul>
+
+                <p>Since TGR is absent in mammals and essential for parasite survival,
+                it represents an ideal drug target for developing new antiparasitic therapies.</p>
             </div>
         </div>
-        <div class="info-card">
-            <div class="info-card-title">Features</div>
-            <div class="info-card-text">
-                Uses circular fingerprints with radius 2 to capture
-                molecular substructure patterns.
+        """, unsafe_allow_html=True)
+
+    with col2:
+        st.markdown("""
+        <div class="glass-card">
+            <div class="section-header">🤖 About the Model</div>
+            <div class="info-card-text" style="color: rgba(255,255,255,0.8); line-height: 1.8;">
+                <p><strong style="color: #00e0ff;">Machine Learning Approach:</strong></p>
+                <ul>
+                    <li><strong>Algorithm:</strong> Random Forest Classifier</li>
+                    <li><strong>Features:</strong> Morgan Fingerprints (2048 bits, radius 2)</li>
+                    <li><strong>Training Data:</strong> Curated TGR bioactivity data</li>
+                </ul>
+
+                <p><strong style="color: #00e0ff;">How it works:</strong></p>
+                <ol>
+                    <li>SMILES notation is converted to molecular structure</li>
+                    <li>Morgan fingerprints capture molecular features</li>
+                    <li>Random Forest predicts activity/inactivity</li>
+                </ol>
             </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+    st.markdown("""
+    <div class="glass-card" style="margin-top: 1rem;">
+        <div class="section-header">📚 References & Resources</div>
+        <div class="info-card-text" style="color: rgba(255,255,255,0.8);">
+            <ul>
+                <li><a href="https://pubchem.ncbi.nlm.nih.gov/" target="_blank" style="color: #00e0ff;">PubChem</a> - Find SMILES notations for compounds</li>
+                <li><a href="https://www.ebi.ac.uk/chembl/" target="_blank" style="color: #00e0ff;">ChEMBL</a> - Bioactivity database</li>
+                <li><a href="https://rdkit.org/" target="_blank" style="color: #00e0ff;">RDKit</a> - Chemistry toolkit used for fingerprint generation</li>
+            </ul>
         </div>
     </div>
     """, unsafe_allow_html=True)
