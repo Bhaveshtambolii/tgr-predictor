@@ -7,8 +7,9 @@ joblib
 matplotlib
 seaborn
 streamlit>=1.32.0
+streamlit-ketcher
+py3Dmol
+plotly
 langchain==0.1.16
 langchain-core==0.1.46
 langchain-groq==0.1.3
-
-
