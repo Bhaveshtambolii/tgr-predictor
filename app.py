@@ -1188,6 +1188,8 @@ if st.session_state.current_page == "predictor":
     # Initialize session state
     if "selected_smiles" not in st.session_state:
         st.session_state.selected_smiles = ""
+    if "smiles_input" not in st.session_state:
+        st.session_state.smiles_input = ""
     if "pubchem_suggestions" not in st.session_state:
         st.session_state.pubchem_suggestions = []
 
@@ -1226,14 +1228,10 @@ if st.session_state.current_page == "predictor":
         # ========== SMILES INPUT (Main - Outside) ==========
         user_input = st.text_input(
             "Enter SMILES Notation",
-            value=st.session_state.selected_smiles,
             placeholder="e.g., CC(=O)Oc1ccccc1C(=O)O",
-            help="SMILES (Simplified Molecular Input Line Entry System) is a notation for describing molecular structures"
+            help="SMILES (Simplified Molecular Input Line Entry System) is a notation for describing molecular structures",
+            key="smiles_input"
         )
-        # Clear selected_smiles after it's been used as the input value so it
-        # doesn't keep repopulating the field on every subsequent rerun
-        if st.session_state.selected_smiles:
-            st.session_state.selected_smiles = ""
 
         # Clear stale prediction result when the SMILES input changes
         if (st.session_state.get("predictor_result") is not None and
@@ -1292,9 +1290,11 @@ if st.session_state.current_page == "predictor":
                         try:
                             compounds = pcp.get_compounds(selected, 'name')
                             if compounds:
-                                st.session_state.selected_smiles = compounds[0].isomeric_smiles
+                                fetched_smiles = compounds[0].isomeric_smiles
+                                st.session_state.selected_smiles = fetched_smiles
+                                st.session_state.smiles_input = fetched_smiles  # populate the text input widget
                                 st.session_state.pubchem_suggestions = []  # Clear suggestions
-                                st.success(f"✅ {selected} → `{st.session_state.selected_smiles}`")
+                                st.success(f"✅ {selected} → `{fetched_smiles}`")
                                 st.rerun()
                         except Exception as e:
                             st.error(f"Error: {e}")
