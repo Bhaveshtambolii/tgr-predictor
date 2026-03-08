@@ -791,11 +791,45 @@ st.markdown("""
         /* Mobile responsive */
         @media (max-width: 768px) {
             .magic-line-nav {
-                padding: 0.5rem 1rem;
+                padding: 0.5rem 0.25rem;
+                overflow-x: auto;
+                -webkit-overflow-scrolling: touch;
+                justify-content: flex-start;
+            }
+            .magic-line-nav-inner {
+                flex-wrap: nowrap;
+                min-width: max-content;
             }
             .magic-line-nav a {
-                padding: 0.5rem 1rem;
-                font-size: 0.9rem;
+                padding: 0.4rem 0.6rem;
+                font-size: 0.75rem;
+                white-space: nowrap;
+            }
+            .main-title {
+                font-size: 1.6rem !important;
+            }
+            .main-subtitle {
+                font-size: 0.85rem !important;
+            }
+            .glass-card {
+                padding: 1rem !important;
+            }
+            .main .block-container {
+                padding-left: 0.5rem !important;
+                padding-right: 0.5rem !important;
+                max-width: 100vw !important;
+                overflow-x: hidden;
+            }
+        }
+
+        /* Prevent horizontal overflow globally on mobile */
+        @media (max-width: 768px) {
+            body, [data-testid="stAppViewContainer"] {
+                overflow-x: hidden !important;
+                max-width: 100vw !important;
+            }
+            [data-testid="stMain"] {
+                overflow-x: hidden !important;
             }
         }
     </style>
@@ -871,6 +905,18 @@ if "current_page" not in st.session_state:
     st.session_state.current_page = "predictor"
 if "analyze_smiles" not in st.session_state:
     st.session_state.analyze_smiles = ""
+
+# --- ANALYSIS TAB RESULT PERSISTENCE ---
+if "batch_result" not in st.session_state:
+    st.session_state.batch_result = None       # dict: {df, csv}
+if "viewer_3d_result" not in st.session_state:
+    st.session_state.viewer_3d_result = None   # dict: {mol_block, smiles, style, bg, pred_label, pred_color, pred_icon}
+if "props_result" not in st.session_state:
+    st.session_state.props_result = None       # dict of computed props
+if "cluster_result" not in st.session_state:
+    st.session_state.cluster_result = None     # dict: {plot_df, axis_labels, method, n_fps, n_total, preds}
+if "export_result" not in st.session_state:
+    st.session_state.export_result = None      # dict: {result_df, csv, sdf, img_bytes, smiles_col}
 
 # Define pages
 PAGES = {
@@ -998,7 +1044,7 @@ with st.sidebar:
 # HERO HEADER (Common for all pages)
 # =====================================================================
 st.markdown("""
-<div class="glass-card" style="text-align: center; padding: 1.5rem 1rem; margin: 0.5rem auto 1rem auto; max-width: 700px;">
+<div class="glass-card" style="text-align: center; padding: 1.5rem 1rem; margin: 0.5rem auto 1rem auto; max-width: min(700px, 100%);">
     <div class="main-title" style="font-size: 2.5rem; margin-bottom: 0.3rem;">🧪 TGR Activity Predictor</div>
     <div class="main-subtitle" style="font-size: 1rem; margin-bottom: 0;">
         Predict compound activity against <strong>Thioredoxin Glutathione Reductase (TGR)</strong><br>
@@ -1184,6 +1230,15 @@ if st.session_state.current_page == "predictor":
             placeholder="e.g., CC(=O)Oc1ccccc1C(=O)O",
             help="SMILES (Simplified Molecular Input Line Entry System) is a notation for describing molecular structures"
         )
+        # Clear selected_smiles after it's been used as the input value so it
+        # doesn't keep repopulating the field on every subsequent rerun
+        if st.session_state.selected_smiles:
+            st.session_state.selected_smiles = ""
+
+        # Clear stale prediction result when the SMILES input changes
+        if (st.session_state.get("predictor_result") is not None and
+                user_input.strip() != st.session_state.predictor_result.get("smiles", "")):
+            st.session_state.predictor_result = None
 
         # Example SMILES section
         st.markdown("""
@@ -1443,8 +1498,11 @@ if st.session_state.current_page == "predictor":
 # PAGE: ANALYSIS
 # =====================================================================
 elif st.session_state.current_page == "analysis":
-    # Grab and consume the analyze_smiles from session state
+    # Grab and consume the analyze_smiles from session state — clear immediately so it
+    # doesn't re-run the auto-analysis on every subsequent visit to this page
     _auto_smiles = st.session_state.analyze_smiles or ""
+    if _auto_smiles:
+        st.session_state.analyze_smiles = ""
 
     # ================================================================
     # AUTO-ANALYSIS SECTION — runs automatically when SMILES is passed
@@ -1622,19 +1680,23 @@ elif st.session_state.current_page == "analysis":
                             results.append("Active" if pred == 1 else "Inactive")
                         else:
                             results.append("Invalid SMILES")
-
                     df['Prediction'] = results
-                    st.success("Batch prediction complete!")
-                    st.dataframe(df)
+                    st.session_state.batch_result = {
+                        "df": df,
+                        "csv": df.to_csv(index=False)
+                    }
 
-                    csv_data = df.to_csv(index=False)
-                    st.download_button(
-                        "📥 Download Results",
-                        csv_data,
-                        "tgr_predictions.csv",
-                        "text/csv",
-                        key="batch_download"
-                    )
+        if st.session_state.batch_result is not None:
+            _b = st.session_state.batch_result
+            st.success("Batch prediction complete!")
+            st.dataframe(_b["df"])
+            st.download_button(
+                "📥 Download Results",
+                _b["csv"],
+                "tgr_predictions.csv",
+                "text/csv",
+                key="batch_download"
+            )
 
     # ---- TAB 2: 3D VIEWER ----
     with tab_3d:
@@ -1660,6 +1722,11 @@ elif st.session_state.current_page == "analysis":
         with col_style2:
             bg_color = st.color_picker("Background Color", "#0f2027", key="viewer_bg")
 
+        # Clear 3D result if SMILES changed
+        if (st.session_state.viewer_3d_result is not None and
+                st.session_state.viewer_3d_result.get("smiles") != viewer_smiles):
+            st.session_state.viewer_3d_result = None
+
         if st.button("🧊 GENERATE 3D VIEW", use_container_width=True, type="primary", key="gen_3d_btn"):
             if not viewer_smiles or not viewer_smiles.strip():
                 st.warning("Please enter a SMILES notation.")
@@ -1673,42 +1740,54 @@ elif st.session_state.current_page == "analysis":
                         result = AllChem.EmbedMolecule(mol_3d, AllChem.ETKDGv3())
                         if result == -1:
                             st.error("Could not generate 3D coordinates for this molecule.")
+                            st.session_state.viewer_3d_result = None
                         else:
                             AllChem.MMFFOptimizeMolecule(mol_3d, maxIters=500)
                             mol_block = Chem.MolToMolBlock(mol_3d)
-
-                            viewer_html = f"""
-                            <script src="https://3Dmol.org/build/3Dmol-min.js"></script>
-                            <div id="viewer3d" style="width: 100%; height: 500px; position: relative;
-                                 border-radius: 16px; border: 1px solid rgba(0,224,255,0.2); overflow: hidden;"></div>
-                            <script>
-                                var viewer = $3Dmol.createViewer("viewer3d", {{
-                                    backgroundColor: "{bg_color}"
-                                }});
-                                viewer.addModel(`{mol_block}`, "mol");
-                                viewer.setStyle({{}}, {{"{view_style}": {{colorscheme: "Jmol"}}}});
-                                viewer.zoomTo();
-                                viewer.spin(true);
-                                viewer.render();
-                            </script>
-                            """
-                            components.html(viewer_html, height=520)
-
-                            # Also show TGR prediction
                             fp = smiles_to_fp(viewer_smiles)
+                            pred_label = pred_color = pred_icon = None
                             if fp is not None:
                                 pred = model.predict(fp)[0]
                                 pred_label = "Active" if pred == 1 else "Inactive"
                                 pred_color = "#22c55e" if pred == 1 else "#ef4444"
                                 pred_icon = "✅" if pred == 1 else "❌"
-                                st.markdown(f"""
-                                <div class="glass-card" style="text-align: center; padding: 1rem;">
-                                    <span style="color: rgba(255,255,255,0.5);">TGR Prediction:</span>
-                                    <span style="color: {pred_color}; font-weight: 700; font-size: 1.2rem; margin-left: 0.5rem;">
-                                        {pred_icon} {pred_label}
-                                    </span>
-                                </div>
-                                """, unsafe_allow_html=True)
+                            st.session_state.viewer_3d_result = {
+                                "mol_block": mol_block,
+                                "smiles": viewer_smiles,
+                                "style": view_style,
+                                "bg": bg_color,
+                                "pred_label": pred_label,
+                                "pred_color": pred_color,
+                                "pred_icon": pred_icon,
+                            }
+
+        if st.session_state.viewer_3d_result is not None:
+            _v = st.session_state.viewer_3d_result
+            viewer_html = f"""
+            <script src="https://3Dmol.org/build/3Dmol-min.js"></script>
+            <div id="viewer3d" style="width: 100%; height: 500px; position: relative;
+                 border-radius: 16px; border: 1px solid rgba(0,224,255,0.2); overflow: hidden;"></div>
+            <script>
+                var viewer = $3Dmol.createViewer("viewer3d", {{
+                    backgroundColor: "{_v['bg']}"
+                }});
+                viewer.addModel(`{_v['mol_block']}`, "mol");
+                viewer.setStyle({{}}, {{"{_v['style']}": {{colorscheme: "Jmol"}}}});
+                viewer.zoomTo();
+                viewer.spin(true);
+                viewer.render();
+            </script>
+            """
+            components.html(viewer_html, height=520)
+            if _v["pred_label"]:
+                st.markdown(f"""
+                <div class="glass-card" style="text-align: center; padding: 1rem;">
+                    <span style="color: rgba(255,255,255,0.5);">TGR Prediction:</span>
+                    <span style="color: {_v['pred_color']}; font-weight: 700; font-size: 1.2rem; margin-left: 0.5rem;">
+                        {_v['pred_icon']} {_v['pred_label']}
+                    </span>
+                </div>
+                """, unsafe_allow_html=True)
 
     # ---- TAB 3: PHYSICOCHEMICAL PROPERTIES ----
     with tab_props:
@@ -1728,6 +1807,11 @@ elif st.session_state.current_page == "analysis":
             key="props_smiles_input"
         )
 
+        # Clear props result if SMILES changed
+        if (st.session_state.props_result is not None and
+                st.session_state.props_result.get("smiles") != props_smiles):
+            st.session_state.props_result = None
+
         if st.button("💊 CALCULATE PROPERTIES", use_container_width=True, type="primary", key="calc_props_btn"):
             if not props_smiles or not props_smiles.strip():
                 st.warning("Please enter a SMILES notation.")
@@ -1744,48 +1828,57 @@ elif st.session_state.current_page == "analysis":
                     rotatable = Descriptors.NumRotatableBonds(mol)
                     rings = Descriptors.RingCount(mol)
                     frac_csp3 = Descriptors.FractionCSP3(mol)
-
                     lipinski_pass = sum([mw <= 500, logp <= 5, hbd <= 5, hba <= 10])
-                    lipinski_ok = lipinski_pass >= 3
-                    lip_color = "#22c55e" if lipinski_ok else "#ef4444"
-                    lip_icon = "✅" if lipinski_ok else "⚠️"
-                    lip_text = "PASSES" if lipinski_ok else "FAILS"
-
                     fp = smiles_to_fp(props_smiles)
-                    pred_html = ""
+                    pred_label = pred_color = pred_icon = None
                     if fp is not None:
                         pred = model.predict(fp)[0]
                         pred_label = "Active" if pred == 1 else "Inactive"
                         pred_color = "#22c55e" if pred == 1 else "#ef4444"
                         pred_icon = "✅" if pred == 1 else "❌"
-                        pred_html = f'<div style="margin-top: 0.6rem; font-size: 1.1rem; font-weight: 700; color: {pred_color};">{pred_icon} TGR: {pred_label}</div>'
+                    st.session_state.props_result = {
+                        "smiles": props_smiles,
+                        "mw": mw, "logp": logp, "hbd": hbd, "hba": hba,
+                        "tpsa": tpsa, "rotatable": rotatable, "rings": rings,
+                        "frac_csp3": frac_csp3, "lipinski_pass": lipinski_pass,
+                        "pred_label": pred_label, "pred_color": pred_color, "pred_icon": pred_icon,
+                    }
 
-                    st.markdown(f"""
-                    <div class="glass-card" style="padding: 1.2rem 1.5rem; margin: 0.5rem 0;">
-                        <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.6rem;">
-                            <div class="stat-box"><div class="stat-number">{mw:.1f}</div><div class="stat-label">Mol. Weight (Da)</div></div>
-                            <div class="stat-box"><div class="stat-number">{logp:.2f}</div><div class="stat-label">LogP</div></div>
-                            <div class="stat-box"><div class="stat-number">{hbd}</div><div class="stat-label">H-Bond Donors</div></div>
-                            <div class="stat-box"><div class="stat-number">{hba}</div><div class="stat-label">H-Bond Acceptors</div></div>
-                            <div class="stat-box"><div class="stat-number">{tpsa:.1f}</div><div class="stat-label">TPSA (A²)</div></div>
-                            <div class="stat-box"><div class="stat-number">{rotatable}</div><div class="stat-label">Rotatable Bonds</div></div>
-                            <div class="stat-box"><div class="stat-number">{rings}</div><div class="stat-label">Ring Count</div></div>
-                            <div class="stat-box"><div class="stat-number">{frac_csp3:.2f}</div><div class="stat-label">Fsp3</div></div>
-                        </div>
-                        <div style="text-align: center; margin-top: 0.8rem; padding: 0.8rem; border-radius: 12px; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.06);">
-                            <div style="font-size: 1rem; font-weight: 600; color: {lip_color};">
-                                {lip_icon} Lipinski's Rule of Five: {lip_text} ({lipinski_pass}/4 rules met)
-                            </div>
-                            <div style="color: rgba(255,255,255,0.5); font-size: 0.8rem; margin-top: 0.3rem;">
-                                MW≤500: {"✓" if mw <= 500 else "✗"} &nbsp;|&nbsp;
-                                LogP≤5: {"✓" if logp <= 5 else "✗"} &nbsp;|&nbsp;
-                                HBD≤5: {"✓" if hbd <= 5 else "✗"} &nbsp;|&nbsp;
-                                HBA≤10: {"✓" if hba <= 10 else "✗"}
-                            </div>
-                            {pred_html}
-                        </div>
+        if st.session_state.props_result is not None:
+            _p = st.session_state.props_result
+            _lip_ok = _p["lipinski_pass"] >= 3
+            _lip_color = "#22c55e" if _lip_ok else "#ef4444"
+            _lip_icon = "✅" if _lip_ok else "⚠️"
+            _lip_text = "PASSES" if _lip_ok else "FAILS"
+            _pred_html = ""
+            if _p["pred_label"]:
+                _pred_html = f'<div style="margin-top: 0.6rem; font-size: 1.1rem; font-weight: 700; color: {_p["pred_color"]};">{_p["pred_icon"]} TGR: {_p["pred_label"]}</div>'
+            st.markdown(f"""
+            <div class="glass-card" style="padding: 1.2rem 1.5rem; margin: 0.5rem 0;">
+                <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.6rem;">
+                    <div class="stat-box"><div class="stat-number">{_p['mw']:.1f}</div><div class="stat-label">Mol. Weight (Da)</div></div>
+                    <div class="stat-box"><div class="stat-number">{_p['logp']:.2f}</div><div class="stat-label">LogP</div></div>
+                    <div class="stat-box"><div class="stat-number">{_p['hbd']}</div><div class="stat-label">H-Bond Donors</div></div>
+                    <div class="stat-box"><div class="stat-number">{_p['hba']}</div><div class="stat-label">H-Bond Acceptors</div></div>
+                    <div class="stat-box"><div class="stat-number">{_p['tpsa']:.1f}</div><div class="stat-label">TPSA (A²)</div></div>
+                    <div class="stat-box"><div class="stat-number">{_p['rotatable']}</div><div class="stat-label">Rotatable Bonds</div></div>
+                    <div class="stat-box"><div class="stat-number">{_p['rings']}</div><div class="stat-label">Ring Count</div></div>
+                    <div class="stat-box"><div class="stat-number">{_p['frac_csp3']:.2f}</div><div class="stat-label">Fsp3</div></div>
+                </div>
+                <div style="text-align: center; margin-top: 0.8rem; padding: 0.8rem; border-radius: 12px; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.06);">
+                    <div style="font-size: 1rem; font-weight: 600; color: {_lip_color};">
+                        {_lip_icon} Lipinski's Rule of Five: {_lip_text} ({_p['lipinski_pass']}/4 rules met)
                     </div>
-                    """, unsafe_allow_html=True)
+                    <div style="color: rgba(255,255,255,0.5); font-size: 0.8rem; margin-top: 0.3rem;">
+                        MW≤500: {"✓" if _p['mw'] <= 500 else "✗"} &nbsp;|&nbsp;
+                        LogP≤5: {"✓" if _p['logp'] <= 5 else "✗"} &nbsp;|&nbsp;
+                        HBD≤5: {"✓" if _p['hbd'] <= 5 else "✗"} &nbsp;|&nbsp;
+                        HBA≤10: {"✓" if _p['hba'] <= 10 else "✗"}
+                    </div>
+                    {_pred_html}
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
 
     # ---- TAB 4: CLUSTERING ----
     with tab_cluster:
@@ -1822,7 +1915,6 @@ elif st.session_state.current_page == "analysis":
                     fps = []
                     preds = []
                     valid_smiles = []
-                    valid_indices = []
 
                     for idx, smi in enumerate(cdf[cluster_smiles_col]):
                         fp = smiles_to_fp(str(smi))
@@ -1831,13 +1923,12 @@ elif st.session_state.current_page == "analysis":
                             pred = model.predict(fp)[0]
                             preds.append("Active" if pred == 1 else "Inactive")
                             valid_smiles.append(str(smi))
-                            valid_indices.append(idx)
 
                     if len(fps) < 5:
                         st.error("Need at least 5 valid SMILES for clustering.")
+                        st.session_state.cluster_result = None
                     else:
                         X = np.array(fps)
-
                         if method == "PCA":
                             reducer = PCA(n_components=2, random_state=42)
                             coords = reducer.fit_transform(X)
@@ -1857,42 +1948,49 @@ elif st.session_state.current_page == "analysis":
                             "Prediction": preds,
                             "SMILES": valid_smiles,
                         })
+                        st.session_state.cluster_result = {
+                            "plot_df": plot_df,
+                            "axis_labels": axis_labels,
+                            "method": method,
+                            "n_fps": len(fps),
+                            "n_total": len(cdf),
+                            "preds": preds,
+                        }
 
-                        color_map = {"Active": "#22c55e", "Inactive": "#ef4444"}
-
-                        fig = px.scatter(
-                            plot_df,
-                            x=axis_labels[0],
-                            y=axis_labels[1],
-                            color="Prediction",
-                            color_discrete_map=color_map,
-                            hover_data=["SMILES"],
-                            title=f"{method} — Morgan Fingerprint Space ({len(fps)} compounds)",
-                        )
-                        fig.update_layout(
-                            plot_bgcolor="rgba(15,32,39,0.8)",
-                            paper_bgcolor="rgba(0,0,0,0)",
-                            font_color="rgba(255,255,255,0.8)",
-                            title_font_color="#00e0ff",
-                            legend_title_font_color="#00e0ff",
-                            height=550,
-                        )
-                        fig.update_traces(marker=dict(size=7, opacity=0.8, line=dict(width=0.5, color="rgba(255,255,255,0.3)")))
-
-                        st.plotly_chart(fig, use_container_width=True)
-
-                        # Stats
-                        n_active = preds.count("Active")
-                        n_inactive = preds.count("Inactive")
-                        st.markdown(f"""
-                        <div class="glass-card" style="text-align: center; padding: 1rem;">
-                            <span style="color: #22c55e; font-weight: 600;">{n_active} Active</span>
-                            <span style="color: rgba(255,255,255,0.4);"> &nbsp;|&nbsp; </span>
-                            <span style="color: #ef4444; font-weight: 600;">{n_inactive} Inactive</span>
-                            <span style="color: rgba(255,255,255,0.4);"> &nbsp;|&nbsp; </span>
-                            <span style="color: rgba(255,255,255,0.6);">{len(cdf) - len(fps)} Invalid</span>
-                        </div>
-                        """, unsafe_allow_html=True)
+        if st.session_state.cluster_result is not None:
+            _c = st.session_state.cluster_result
+            _plot_df = _c["plot_df"]
+            _axis = _c["axis_labels"]
+            fig = px.scatter(
+                _plot_df,
+                x=_axis[0],
+                y=_axis[1],
+                color="Prediction",
+                color_discrete_map={"Active": "#22c55e", "Inactive": "#ef4444"},
+                hover_data=["SMILES"],
+                title=f"{_c['method']} — Morgan Fingerprint Space ({_c['n_fps']} compounds)",
+            )
+            fig.update_layout(
+                plot_bgcolor="rgba(15,32,39,0.8)",
+                paper_bgcolor="rgba(0,0,0,0)",
+                font_color="rgba(255,255,255,0.8)",
+                title_font_color="#00e0ff",
+                legend_title_font_color="#00e0ff",
+                height=550,
+            )
+            fig.update_traces(marker=dict(size=7, opacity=0.8, line=dict(width=0.5, color="rgba(255,255,255,0.3)")))
+            st.plotly_chart(fig, use_container_width=True)
+            _n_active = _c["preds"].count("Active")
+            _n_inactive = _c["preds"].count("Inactive")
+            st.markdown(f"""
+            <div class="glass-card" style="text-align: center; padding: 1rem;">
+                <span style="color: #22c55e; font-weight: 600;">{_n_active} Active</span>
+                <span style="color: rgba(255,255,255,0.4);"> &nbsp;|&nbsp; </span>
+                <span style="color: #ef4444; font-weight: 600;">{_n_inactive} Inactive</span>
+                <span style="color: rgba(255,255,255,0.4);"> &nbsp;|&nbsp; </span>
+                <span style="color: rgba(255,255,255,0.6);">{_c['n_total'] - _c['n_fps']} Invalid</span>
+            </div>
+            """, unsafe_allow_html=True)
 
     # ---- TAB 5: EXPORT ----
     with tab_export:
@@ -1947,27 +2045,16 @@ elif st.session_state.current_page == "analysis":
                             "RotBonds": Descriptors.NumRotatableBonds(mol),
                         })
 
-                        # For SDF
                         mol_copy = Chem.RWMol(mol)
                         mol_copy.SetProp("TGR_Prediction", pred_label)
                         mol_copy.SetProp("SMILES", smi)
                         sdf_mols.append(mol_copy)
 
                     result_df = pd.DataFrame(export_rows)
-                    st.success(f"Processed {len(result_df)} compounds!")
-                    st.dataframe(result_df)
-
-                    # CSV download
                     csv_export = result_df.to_csv(index=False)
-                    st.download_button(
-                        "📥 Download CSV (with properties)",
-                        csv_export,
-                        "tgr_analysis_export.csv",
-                        "text/csv",
-                        key="export_csv_dl"
-                    )
 
-                    # SDF download
+                    # SDF
+                    sdf_data = b""
                     if sdf_mols:
                         sdf_buffer = io.StringIO()
                         writer = Chem.SDWriter(sdf_buffer)
@@ -1979,52 +2066,48 @@ elif st.session_state.current_page == "analysis":
                                 pass
                         writer.close()
                         sdf_data = sdf_buffer.getvalue().encode("utf-8")
-                        st.download_button(
-                            "📥 Download SDF",
-                            sdf_data,
-                            "tgr_compounds.sdf",
-                            "chemical/x-mdl-sdfile",
-                            key="export_sdf_dl"
-                        )
 
-                    # 2D structure grid image
+                    # Grid image
+                    img_bytes = b""
                     valid_mols = [Chem.MolFromSmiles(str(s)) for s in result_df[export_smiles_col] if Chem.MolFromSmiles(str(s)) is not None]
                     if valid_mols:
-                        grid_mols = valid_mols[:20]  # Limit to 20 for the grid
+                        grid_mols = valid_mols[:20]
                         legends = []
                         for m in grid_mols:
-                            smi = Chem.MolToSmiles(m)
-                            fp = smiles_to_fp(smi)
-                            if fp is not None:
-                                p = model.predict(fp)[0]
-                                legends.append("Active" if p == 1 else "Inactive")
-                            else:
-                                legends.append("")
+                            _smi = Chem.MolToSmiles(m)
+                            _fp = smiles_to_fp(_smi)
+                            legends.append(("Active" if model.predict(_fp)[0] == 1 else "Inactive") if _fp is not None else "")
+                        _img = Draw.MolsToGridImage(grid_mols, molsPerRow=4, subImgSize=(300, 250), legends=legends)
+                        _buf = io.BytesIO()
+                        _img.save(_buf, format="PNG")
+                        img_bytes = _buf.getvalue()
 
-                        img = Draw.MolsToGridImage(
-                            grid_mols,
-                            molsPerRow=4,
-                            subImgSize=(300, 250),
-                            legends=legends,
-                        )
-                        buf = io.BytesIO()
-                        img.save(buf, format="PNG")
-                        buf.seek(0)
+                    st.session_state.export_result = {
+                        "result_df": result_df,
+                        "csv": csv_export,
+                        "sdf": sdf_data,
+                        "img_bytes": img_bytes,
+                        "smiles_col": export_smiles_col,
+                    }
 
-                        st.markdown("""
-                        <div class="glass-card">
-                            <div class="section-header">🖼️ 2D Structure Grid (first 20)</div>
-                        </div>
-                        """, unsafe_allow_html=True)
-                        st.image(buf, use_container_width=True)
-
-                        st.download_button(
-                            "📥 Download Structure Grid (PNG)",
-                            buf.getvalue(),
-                            "tgr_structures.png",
-                            "image/png",
-                            key="export_img_dl"
-                        )
+        if st.session_state.export_result is not None:
+            _e = st.session_state.export_result
+            st.success(f"Processed {len(_e['result_df'])} compounds!")
+            st.dataframe(_e["result_df"])
+            st.download_button("📥 Download CSV (with properties)", _e["csv"],
+                               "tgr_analysis_export.csv", "text/csv", key="export_csv_dl")
+            if _e["sdf"]:
+                st.download_button("📥 Download SDF", _e["sdf"],
+                                   "tgr_compounds.sdf", "chemical/x-mdl-sdfile", key="export_sdf_dl")
+            if _e["img_bytes"]:
+                st.markdown("""
+                <div class="glass-card">
+                    <div class="section-header">🖼️ 2D Structure Grid (first 20)</div>
+                </div>
+                """, unsafe_allow_html=True)
+                st.image(_e["img_bytes"], use_container_width=True)
+                st.download_button("📥 Download Structure Grid (PNG)", _e["img_bytes"],
+                                   "tgr_structures.png", "image/png", key="export_img_dl")
 
 # =====================================================================
 # PAGE: MOLECULE DRAWER
@@ -2045,6 +2128,11 @@ elif st.session_state.current_page == "drawer":
         st.session_state.drawer_result = None
 
     if drawn_smiles:
+        # Clear stale result if the drawn molecule has changed
+        if (st.session_state.drawer_result is not None and
+                st.session_state.drawer_result.get("smiles") != drawn_smiles):
+            st.session_state.drawer_result = None
+
         st.markdown(f"""
         <div class="glass-card" style="text-align: center;">
             <span style="color: rgba(255,255,255,0.5);">Extracted SMILES:</span>
@@ -2145,6 +2233,8 @@ elif st.session_state.current_page == "similarity":
         search_sim = st.button("🔍 SEARCH SIMILAR COMPOUNDS", use_container_width=True, type="primary", key="search_sim_btn")
 
     if search_sim:
+        # Clear previous results before running a new search
+        st.session_state.sim_results = []
         if not sim_smiles or not sim_smiles.strip():
             st.warning("Please enter a SMILES notation to search.")
         else:
