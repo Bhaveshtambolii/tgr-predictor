@@ -1186,12 +1186,18 @@ with nav_cols[4]:
 # =====================================================================
 if st.session_state.current_page == "predictor":
     # Initialize session state
-    if "selected_smiles" not in st.session_state:
-        st.session_state.selected_smiles = ""
     if "smiles_input" not in st.session_state:
         st.session_state.smiles_input = ""
+    if "pending_smiles" not in st.session_state:
+        st.session_state.pending_smiles = ""
     if "pubchem_suggestions" not in st.session_state:
         st.session_state.pubchem_suggestions = []
+
+    # Transfer pending SMILES into the widget key BEFORE the widget is rendered.
+    # (Writing to a widget-bound key after the widget exists raises an error.)
+    if st.session_state.pending_smiles:
+        st.session_state.smiles_input = st.session_state.pending_smiles
+        st.session_state.pending_smiles = ""
 
     # Centered container for Molecular Prediction UI
     _, pred_container, _ = st.columns([1, 2, 1])
@@ -1291,8 +1297,9 @@ if st.session_state.current_page == "predictor":
                             compounds = pcp.get_compounds(selected, 'name')
                             if compounds:
                                 fetched_smiles = compounds[0].isomeric_smiles
-                                st.session_state.selected_smiles = fetched_smiles
-                                st.session_state.smiles_input = fetched_smiles  # populate the text input widget
+                                # Write to pending_smiles (not the widget key) to avoid
+                                # the "cannot modify after widget instantiation" error.
+                                st.session_state.pending_smiles = fetched_smiles
                                 st.session_state.pubchem_suggestions = []  # Clear suggestions
                                 st.success(f"✅ {selected} → `{fetched_smiles}`")
                                 st.rerun()
